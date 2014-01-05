@@ -1,3 +1,8 @@
+var screenSize = {
+  x: 800,
+  y: 400, 
+}
+
 var shipPoly = [
   [  0, -15],
   [-10,  15],
@@ -102,15 +107,45 @@ function initGame(canvas){
 
   var iPos = [100, 100];
   var position = speed.scan(iPos, function(oldPos, speed) {
-    return translatePt(oldPos, speed);
+    var newPos = translatePt(oldPos, speed);
+    if (newPos[0] < 0) newPos[0] += screenSize.x;
+    if (newPos[0] > screenSize.x) newPos[0] -= screenSize.x;
+    if (newPos[1] < 0) newPos[1] += screenSize.y;
+    if (newPos[1] > screenSize.y) newPos[1] -= screenSize.y;
+    return newPos;
   });
 
   var shipCoords = rotation.zip(position, function(r, pt) {
     return [pt, r];
   });
 
+  var tolerance = 20;
   shipCoords.subscribe(function(v) {
     drawShip(ctx, v[0], v[1]);
+    var pos = v[0];
+    var x = pos[0];
+    var y = pos[1];
+
+    var otherSide = null;
+
+    if (x < tolerance) {
+      otherSide = [x + screenSize.x, y];
+    } else if (x > screenSize.x - tolerance) {
+      otherSide = [x - screenSize.x, y];
+    }
+
+    if (y < tolerance) {
+      otherSide = otherSide || pos.concat();
+      otherSide[1] = y + screenSize.y
+    } else if (y > screenSize.y - tolerance) {
+      otherSide = otherSide || pos.concat();
+      otherSide[1] = y - screenSize.y
+    }
+
+    if (otherSide) {
+      drawShip(ctx, otherSide, v[1]);
+    }
+
   });
 
 }
