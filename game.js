@@ -23,6 +23,10 @@ function translatePt(pt, dxdy) {
   return [pt[0] + dxdy[0], pt[1] + dxdy[1]];
 }
 
+function clearShip(ctx, pos) {
+  ctx.clearRect(pos[0] - 20, pos[1] - 20, 40, 40);
+}
+
 function drawShip(ctx, pos, r) {
   var ship = shipPoly.map(function(pt) {
     var newPt = rotatePoint(pt, r);
@@ -32,9 +36,6 @@ function drawShip(ctx, pos, r) {
 
     return newPt;
   });
-
-  // clear
-  ctx.clearRect(pos[0] - 20, pos[1] - 20, 40, 40);
 
   ctx.fillStyle = '#F00';
   ctx.beginPath();
@@ -115,39 +116,57 @@ function initGame(canvas){
     return newPos;
   });
 
+  // shipCoords = [ [[oldX, oldY], oldR], [[newX, newY], newR]]; 
   var shipCoords = rotation.zip(position, function(r, pt) {
     return [pt, r];
-  });
+  }).bufferWithCount(2, 1);
 
-  var tolerance = 20;
-  shipCoords.subscribe(function(v) {
-    drawShip(ctx, v[0], v[1]);
-    var pos = v[0];
-    var x = pos[0];
-    var y = pos[1];
 
-    var otherSide = null;
+  shipCoords.subscribe(function(lastTwo) {
+    var prev = lastTwo[0];
 
-    if (x < tolerance) {
-      otherSide = [x + screenSize.x, y];
-    } else if (x > screenSize.x - tolerance) {
-      otherSide = [x - screenSize.x, y];
+    clearShip(ctx, prev[0]);
+
+    var oldOtherSide = foldPointOnScreen(prev[0]);
+    if (oldOtherSide) {
+      clearShip(ctx, oldOtherSide);
     }
 
-    if (y < tolerance) {
-      otherSide = otherSide || pos.concat();
-      otherSide[1] = y + screenSize.y
-    } else if (y > screenSize.y - tolerance) {
-      otherSide = otherSide || pos.concat();
-      otherSide[1] = y - screenSize.y
-    }
+    var curr = lastTwo[1];
+    drawShip(ctx, curr[0], curr[1]);
+    var pos = curr[0];
+
+    var otherSide = foldPointOnScreen(pos);
 
     if (otherSide) {
-      drawShip(ctx, otherSide, v[1]);
+      drawShip(ctx, otherSide, curr[1]);
     }
 
   });
+}
 
+var tolerance = 20;
+function foldPointOnScreen(pt) {
+  var x = pt[0];
+  var y = pt[1];
+
+  var foldedPt = null;
+
+  if (x < tolerance) {
+    foldedPt = [x + screenSize.x, y];
+  } else if (x > screenSize.x - tolerance) {
+    foldedPt = [x - screenSize.x, y];
+  }
+
+  if (y < tolerance) {
+    foldedPt = foldedPt || pt.concat();
+    foldedPt[1] = y + screenSize.y
+  } else if (y > screenSize.y - tolerance) {
+    foldedPt = foldedPt || pt.concat();
+    foldedPt[1] = y - screenSize.y
+  }
+
+  return foldedPt;
 }
 
 var isNonZero = function(v) {return v != 0;};
