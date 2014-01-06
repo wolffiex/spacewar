@@ -69,7 +69,7 @@ function getTimer() {
     function() { return 10; }
   );
 
-  var timer = generator.take(200).publish();
+  var timer = generator.publish();
   var connect = timer.connect();
 
   return timer;
@@ -135,12 +135,27 @@ function initGame(canvas){
   });
 
   var noAccel = [0,0];
-  var thrustSpeed = -0.02;
+  var thrustSpeed = -0.002;
 
+  var maxSpeed = 4;
+  var maxHyp = maxSpeed * maxSpeed;
   var speed = timer.zip(rotation, function(dt, r) {
     return keys.thrust ? rotatePoint([0, thrustSpeed * dt], r) : noAccel;
-  }).scan([0,-20], function(oldSpeed, accel) {
-    return translatePt( oldSpeed, accel);
+  }).scan([0,0], function(oldSpeed, accel) {
+    var s = translatePt(oldSpeed, accel);
+    var sHyp = s[0] * s[0] + s[1] * s[1];
+    if (sHyp > maxHyp) {
+      var r = Math.atan(s[0] == 0 ? 0 : s[1]/s[0]);
+      newS = rotatePoint([maxSpeed, 0], r);
+      if (s[0] < 0 ) {
+        newS[0] *= -1;
+        newS[1] *= -1;
+      }
+
+      s = newS;
+    }
+
+    return s;
   });
 
   var iPos = [100, 100];
@@ -173,7 +188,6 @@ function initGame(canvas){
     if (drawInfo) {
       var curr = drawInfo;
       drawInfo = null;
-      console.log(curr[0])
 
       ctx.clearRect(0, 0, screenSize.x, screenSize.y);
 
@@ -183,7 +197,7 @@ function initGame(canvas){
       var otherSide = foldPointOnScreen(pos);
 
       if (otherSide) {
-        //drawShip(ctx, otherSide, curr[1]);
+        drawShip(ctx, otherSide, curr[1]);
       }
     }
     requestAnimationFrame(render);
