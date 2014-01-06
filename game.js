@@ -50,12 +50,34 @@ function drawShip(ctx, pos, r) {
   ctx.fill();
 }
 
+fS = {a : "rgb(200,0,0)", b: "rgb(0,200,0)", isA: false};
+
+function getTimer() {
+  var lastTime = Date.now();
+  var generator = Rx.Observable.generateWithRelativeTime(
+    Date.now(), 
+    constF(true),
+    function(nowTime) { 
+      lastTime = nowTime;
+      var nowTime = Date.now();
+      return nowTime;
+    },
+    function(nowTime) {
+      var diff = nowTime - lastTime;
+      return diff;
+    },
+    function() { return 10; }
+  );
+
+  var timer = generator.take(200).publish();
+  var connect = timer.connect();
+
+  return timer;
+
+}
+
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
-  drawShip(ctx, 100, 100, 0);
-
-  var timer = Rx.Observable.timer(10, 10);
-
   var keyMap = {
     'left'   : 37,
     'thrust' : 38,
@@ -82,29 +104,44 @@ function initGame(canvas){
 
   var leftKey = keyStream(keyMap.left);
   var rightKey = keyStream(keyMap.right);
+  var thrustKey = keyStream(keyMap.thrust);
 
-  var rotSpeed = 0.03;
+  var keyStream = leftKey.combineLatest(rightKey, thrustKey,
+    function(l, r, t) {
+      return {
+        left: l,
+        right: r,
+        thrust: t,
+      };
+    }); 
 
+  var keys = null;
+  keyStream.subscribe(function(v) {
+    keys = v;
+  });
+
+  var timer = getTimer();
+
+  var rotSpeed = 0.003;
   var ir = 0;
-  var rotation = timer.combineLatest(leftKey, rightKey, 
-    function(t, leftIsDown, rightIsDown) {
-      var v = 0;
-      if (leftIsDown) v -= rotSpeed;
-      if (rightIsDown) v += rotSpeed;
-      return v;
-    }).scan(ir, function(acc, v) {
-      return acc + v;
-    });
+
+  var rotation = timer.map(function(dt) {
+    var dr = 0;
+    if (keys.left) dr -= dt * rotSpeed;
+    if (keys.right) dr += dt * rotSpeed;
+    return dr;
+  }).scan(ir, function(rot, dr) {
+    return rot + dr;
+  });
 
   var noAccel = [0,0];
-  var thrustSpeed = [0, -0.02];
+  var thrustSpeed = -0.02;
 
-  var speed = rotation.combineLatest(keyStream(keyMap.thrust),
-    function(r, thrustIsDown) {
-      return thrustIsDown ? rotatePoint(thrustSpeed, r) : noAccel;
-    }).scan([0,0], function(oldSpeed, accel) {
-      return translatePt( oldSpeed, accel);
-    });
+  var speed = timer.zip(rotation, function(dt, r) {
+    return keys.thrust ? rotatePoint([0, thrustSpeed * dt], r) : noAccel;
+  }).scan([0,-20], function(oldSpeed, accel) {
+    return translatePt( oldSpeed, accel);
+  });
 
   var iPos = [100, 100];
   var position = speed.scan(iPos, function(oldPos, speed) {
@@ -116,33 +153,43 @@ function initGame(canvas){
     return newPos;
   });
 
-  // shipCoords = [ [[oldX, oldY], oldR], [[newX, newY], newR]]; 
-  var shipCoords = rotation.zip(position, function(r, pt) {
+  // info = [[newX, newY], newR]; 
+  var info = rotation.zip(position, function(r, pt) {
     return [pt, r];
-  }).bufferWithCount(2, 1);
-
-
-  shipCoords.subscribe(function(lastTwo) {
-    var prev = lastTwo[0];
-
-    clearShip(ctx, prev[0]);
-
-    var oldOtherSide = foldPointOnScreen(prev[0]);
-    if (oldOtherSide) {
-      clearShip(ctx, oldOtherSide);
-    }
-
-    var curr = lastTwo[1];
-    drawShip(ctx, curr[0], curr[1]);
-    var pos = curr[0];
-
-    var otherSide = foldPointOnScreen(pos);
-
-    if (otherSide) {
-      drawShip(ctx, otherSide, curr[1]);
-    }
-
   });
+
+
+  var drawInfo = null;
+  info.subscribe(function(v) {
+    drawInfo = v;
+  });
+
+
+  var oldTime = null;
+  function render(time) {
+    //fS.isA = !fS.isA;
+    oldTime = time;
+    curr = drawInfo;
+    if (drawInfo) {
+      var curr = drawInfo;
+      drawInfo = null;
+      console.log(curr[0])
+
+      ctx.clearRect(0, 0, screenSize.x, screenSize.y);
+
+      drawShip(ctx, curr[0], curr[1]);
+      var pos = curr[0];
+
+      var otherSide = foldPointOnScreen(pos);
+
+      if (otherSide) {
+        //drawShip(ctx, otherSide, curr[1]);
+      }
+    }
+    requestAnimationFrame(render);
+  };
+
+  requestAnimationFrame(render);
 }
 
 var tolerance = 20;
