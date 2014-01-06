@@ -103,7 +103,7 @@ function initGame(canvas){
   var rightKey = keyStream(keyMap.right);
   var thrustKey = keyStream(keyMap.thrust);
 
-  var keyStream = leftKey.combineLatest(rightKey, thrustKey,
+  var inputStream = leftKey.combineLatest(rightKey, thrustKey,
     function(l, r, t) {
       return {
         left: l,
@@ -113,7 +113,7 @@ function initGame(canvas){
     }); 
 
   var keys = null;
-  keyStream.subscribe(function(v) {
+  inputStream.subscribe(function(v) {
     keys = v;
   });
 
