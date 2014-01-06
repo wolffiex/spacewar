@@ -4,35 +4,32 @@ var screenSize = {
 }
 
 var shipPoly = [
-  [  0, -15],
-  [-10,  15],
-  [  0,   4],
-  [ 10,  15],
+  {x:   0, y: -15},
+  {x: -10, y:  15},
+  {x:   0, y:   4},
+  {x:  10, y:  15},
 ];
 
 function rotatePoint(pt, r) {
-  var x = pt[0];
-  var y = pt[1];
-
-  var x2 = x * Math.cos(r) - y * Math.sin(r);
-  var y2 = x * Math.sin(r) + y * Math.cos(r);
-  return [x2, y2];
+  return { 
+    x: pt.x * Math.cos(r) - pt.y * Math.sin(r),
+    y: pt.x * Math.sin(r) + pt.y * Math.cos(r),
+  };
 }
 
 function translatePt(pt, dxdy) {
-  return [pt[0] + dxdy[0], pt[1] + dxdy[1]];
-}
-
-function clearShip(ctx, pos) {
-  ctx.clearRect(pos[0] - 20, pos[1] - 20, 40, 40);
+  return {
+    x: pt.x + dxdy.x,
+    y: pt.y + dxdy.y,
+  };
 }
 
 function drawShip(ctx, pos, r) {
   var ship = shipPoly.map(function(pt) {
     var newPt = rotatePoint(pt, r);
-    // don't make an extra array
-    newPt[0] += pos[0];
-    newPt[1] += pos[1];
+    // don't make an extra array by calling translatePt
+    newPt.x += pos.x
+    newPt.y += pos.y
 
     return newPt;
   });
@@ -41,10 +38,10 @@ function drawShip(ctx, pos, r) {
   ctx.beginPath();
 
   var start = _.last(ship); 
-  ctx.moveTo(start[0], start[1]);
+  ctx.moveTo(start.x, start.y);
 
   _.forEach(ship, function(pt) {
-    ctx.lineTo(pt[0], pt[1]);
+    ctx.lineTo(pt.x, pt.y);
   });
 
   ctx.fill();
@@ -134,22 +131,23 @@ function initGame(canvas){
     return rot + dr;
   });
 
-  var noAccel = [0,0];
+  var noAccel = {x:0, y:0};
   var thrustSpeed = -0.002;
 
-  var maxSpeed = 4;
-  var maxHyp = maxSpeed * maxSpeed;
+  var maxSpeed = {x:4, y:0};
+  var maxHyp = maxSpeed.x * maxSpeed.x;
+
   var speed = timer.zip(rotation, function(dt, r) {
-    return keys.thrust ? rotatePoint([0, thrustSpeed * dt], r) : noAccel;
-  }).scan([0,0], function(oldSpeed, accel) {
+    return keys.thrust ? rotatePoint({x: 0, y: thrustSpeed * dt}, r) : noAccel;
+  }).scan(noAccel, function(oldSpeed, accel) {
     var s = translatePt(oldSpeed, accel);
-    var sHyp = s[0] * s[0] + s[1] * s[1];
+    var sHyp = s.x * s.x + s.y * s.y;
     if (sHyp > maxHyp) {
-      var r = Math.atan(s[0] == 0 ? 0 : s[1]/s[0]);
-      newS = rotatePoint([maxSpeed, 0], r);
-      if (s[0] < 0 ) {
-        newS[0] *= -1;
-        newS[1] *= -1;
+      var r = Math.atan(s.x == 0 ? 0 : s.y/s.x);
+      newS = rotatePoint(maxSpeed, r);
+      if (s.x < 0 ) {
+        newS.x *= -1;
+        newS.y *= -1;
       }
 
       s = newS;
@@ -158,13 +156,13 @@ function initGame(canvas){
     return s;
   });
 
-  var iPos = [100, 100];
+  var iPos = {x:100, y:100};
   var position = speed.scan(iPos, function(oldPos, speed) {
     var newPos = translatePt(oldPos, speed);
-    if (newPos[0] < 0) newPos[0] += screenSize.x;
-    if (newPos[0] > screenSize.x) newPos[0] -= screenSize.x;
-    if (newPos[1] < 0) newPos[1] += screenSize.y;
-    if (newPos[1] > screenSize.y) newPos[1] -= screenSize.y;
+    if (newPos.x < 0) newPos.x += screenSize.x;
+    if (newPos.x > screenSize.x) newPos.x -= screenSize.x;
+    if (newPos.y < 0) newPos.y += screenSize.y;
+    if (newPos.y > screenSize.y) newPos.y -= screenSize.y;
     return newPos;
   });
 
@@ -208,23 +206,20 @@ function initGame(canvas){
 
 var tolerance = 20;
 function foldPointOnScreen(pt) {
-  var x = pt[0];
-  var y = pt[1];
-
   var foldedPt = null;
 
-  if (x < tolerance) {
-    foldedPt = [x + screenSize.x, y];
-  } else if (x > screenSize.x - tolerance) {
-    foldedPt = [x - screenSize.x, y];
+  if (pt.x < tolerance) {
+    foldedPt = {x: pt.x + screenSize.x, y: pt.y};
+  } else if (pt.x > screenSize.x - tolerance) {
+    foldedPt = {x: pt.x - screenSize.x, y: pt.y};
   }
 
-  if (y < tolerance) {
-    foldedPt = foldedPt || pt.concat();
-    foldedPt[1] = y + screenSize.y
-  } else if (y > screenSize.y - tolerance) {
-    foldedPt = foldedPt || pt.concat();
-    foldedPt[1] = y - screenSize.y
+  if (pt.y < tolerance) {
+    foldedPt = foldedPt || _.clone(pt);
+    foldedPt.y = pt.y + screenSize.y
+  } else if (pt.y > screenSize.y - tolerance) {
+    foldedPt = foldedPt || _.clone(pt);
+    foldedPt.y = pt.y - screenSize.y
   }
 
   return foldedPt;
