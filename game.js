@@ -134,8 +134,8 @@ function initGame(canvas){
   var noAccel = {x:0, y:0};
   var thrustSpeed = -0.002;
 
-  var maxSpeed = {x:4, y:0};
-  var maxHyp = maxSpeed.x * maxSpeed.x;
+  var maxSpeed = {x:0, y:-4};
+  var maxHyp = maxSpeed.y * maxSpeed.y;
 
   var speed = timer.zip(rotation, function(dt, r) {
     return keys.thrust ? rotatePoint({x: 0, y: thrustSpeed * dt}, r) : noAccel;
@@ -143,10 +143,13 @@ function initGame(canvas){
     var s = translatePt(oldSpeed, accel);
     var sHyp = s.x * s.x + s.y * s.y;
     if (sHyp > maxHyp) {
-      var r = Math.atan(s.x == 0 ? 0 : s.y/s.x);
-      newS = rotatePoint(maxSpeed, r);
-      if (s.x < 0 ) {
+      var theta = Math.atan(s.x == 0 ? 0 : s.x/s.y);
+      newS = rotatePoint(maxSpeed, theta);
+      if (s.x * newS.x < 0 ) {
         newS.x *= -1;
+      }
+
+      if (s.y * newS.y < 0 ) {
         newS.y *= -1;
       }
 
@@ -157,7 +160,10 @@ function initGame(canvas){
   });
 
   var iPos = {x:100, y:100};
-  var position = speed.scan(iPos, function(oldPos, speed) {
+  var position = timer.zip(speed, function(dt, s) {
+    var dtScaled = dt/10;
+    return {x:s.x*dtScaled, y:s.y*dtScaled}
+  }).scan(iPos, function(oldPos, speed) {
     var newPos = translatePt(oldPos, speed);
     if (newPos.x < 0) newPos.x += screenSize.x;
     if (newPos.x > screenSize.x) newPos.x -= screenSize.x;
