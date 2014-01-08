@@ -4,10 +4,10 @@ var screenSize = {
 }
 
 var shipPoly = [
-  {x:   0, y: -15},
-  {x: -10, y:  15},
-  {x:   0, y:   4},
-  {x:  10, y:  15},
+  {x:   15, y: 0},
+  {x:  -15, y:  10},
+  {x:   -4, y:   0},
+  {x:  -15, y:  -10},
 ];
 
 function rotatePoint(pt, r) {
@@ -15,6 +15,14 @@ function rotatePoint(pt, r) {
     x: pt.x * Math.cos(r) - pt.y * Math.sin(r),
     y: pt.x * Math.sin(r) + pt.y * Math.cos(r),
   };
+}
+
+function rotatePointX(pt, r) {
+  return pt.x * Math.cos(r) - pt.y * Math.sin(r);
+}
+
+function rotatePointY(pt, r) {
+  return pt.x * Math.sin(r) + pt.y * Math.cos(r);
 }
 
 function translatePt(pt, dxdy) {
@@ -46,8 +54,6 @@ function drawShip(ctx, pos, r) {
 
   ctx.fill();
 }
-
-fS = {a : "rgb(200,0,0)", b: "rgb(0,200,0)", isA: false};
 
 function getTimer() {
   var lastTime = Date.now();
@@ -124,38 +130,105 @@ function initGame(canvas){
       return {t: Date.now(), k: nextKeys};
     }));
 
-  var initialShip = {
-    pos: {x: 100, y: 100},
-    speed: {x: 0, y: 0},
-    r: 0,
-  };
-
   var inputPeriod = actionStream.bufferWithCount(2, 1).map(
     function(keyStates) {
       var oldState = keyStates[0];
       var newState = keyStates[1];
 
       return {
-        t: newState.t - oldState.t,
+        dt: newState.t - oldState.t,
         k: oldState.k,
       };
     });
 
-  inputPeriod.subscribe(function(k) {
-    console.log(k)
-  });
 
 
+  var initialShip = {
+    pos: {x: 100, y: 100},
+    spd: {x: 0, y: 0},
+    rot: 0,
+  };
 
-  var ship = keyStream.scan(initialShip, function(oldShip, keyState) {
-    /*
-    keyState = {
-      dt: <time elapsed>,
-      keys : ...
+  var rotSpeed = 0.003;
+  var thrustAccel = {x: 0.00003, y: 0};
+  var ship = inputPeriod.scan(initialShip, function(oldShip, input) {
+
+    var dt = input.dt;
+    var rot = oldShip.rot;
+    var pos = oldShip.pos;
+    var spd = oldShip.spd;
+
+    if (input.k.thrust) {
+      // This is easier for to express as a simulation than
+      // a continuous function, but I suck at math
+      var spdX = spd.x;
+      var spdY = spd.y;
+
+      var posX = pos.x;
+      var posY = pos.y;
+
+
+      for (var i = 0; i  < dt; i++) {
+        if (input.k.left)  rot -= rotSpeed;
+        if (input.k.right) rot += rotSpeed;
+
+        posX += spdX;
+        posY += spdY;
+
+        spdX += rotatePointX(thrustAccel, rot);
+        spdY += rotatePointY(thrustAccel, rot);
+      }
+
+      spd = {x: spdX, y: spdY};
+      pos = {x: posX, y: posY};
+    } else {
+      if (input.k.left)  rot -= dt*rotSpeed;
+      if (input.k.right) rot += dt*rotSpeed;
+      
+      pos = {
+        x: oldShip.pos.x + dt * oldShip.spd.x,
+        y: oldShip.pos.y + dt * oldShip.spd.y,
+      };
+
     }
-    */
-    var dt = oldSpeed.t - keyState
+
+    if (pos.x < 0) pos.x += screenSize.x;
+    if (pos.x > screenSize.x) pos.x -= screenSize.x;
+    if (pos.y < 0) pos.y += screenSize.y;
+    if (pos.y > screenSize.y) pos.y -= screenSize.y;
+
+
+    return {
+      pos: pos,
+      rot: rot,
+      spd: spd,
+    }
+
   });
+
+  var shipInfo = null;
+  ship.subscribe(function(k) {
+    shipInfo = k;
+  });
+
+  function render(time) {
+    if (shipInfo) {
+      //ctx.clearRect(0, 0, screenSize.x, screenSize.y);
+
+      drawShip(ctx, shipInfo.pos, shipInfo.rot);
+
+      /*
+      var otherSide = foldPointOnScreen(pos);
+
+      if (otherSide) {
+        drawShip(ctx, otherSide, curr[1]);
+      }
+      */
+    } 
+    requestAnimationFrame(render);
+  };
+
+  requestAnimationFrame(render);
 
 
   /*
@@ -266,7 +339,6 @@ function initGame(canvas){
 
   var oldTime = null;
   function render(time) {
-    //fS.isA = !fS.isA;
     oldTime = time;
     curr = drawInfo;
     if (drawInfo) {
