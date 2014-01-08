@@ -130,7 +130,22 @@ function initGame(canvas){
       return {t: Date.now(), k: nextKeys};
     }));
 
-  var inputPeriod = actionStream.bufferWithCount(2, 1).map(
+  var updateObserver = null;
+  var updateStream = Rx.Observable.create(function (observer) {
+    updateObserver = observer;
+  }).combineLatest(actionStream, function(updateTime, lastAction) {
+    return lastAction.t > updateTime ? 
+      lastAction : {
+        t: updateTime,
+        k: lastAction.k,
+      };
+  });
+  
+  function updateSimulation() {
+    if (updateObserver) updateObserver.onNext(Date.now());
+  }
+
+  var inputPeriod = updateStream.bufferWithCount(2, 1).map(
     function(keyStates) {
       var oldState = keyStates[0];
       var newState = keyStates[1];
@@ -150,9 +165,8 @@ function initGame(canvas){
   };
 
   var rotSpeed = 0.003;
-  var thrustAccel = {x: 0.00003, y: 0};
+  var thrustAccel = {x: 0.0001, y: 0};
   var ship = inputPeriod.scan(initialShip, function(oldShip, input) {
-
     var dt = input.dt;
     var rot = oldShip.rot;
     var pos = oldShip.pos;
@@ -203,7 +217,6 @@ function initGame(canvas){
       rot: rot,
       spd: spd,
     }
-
   });
 
   var shipInfo = null;
@@ -213,154 +226,21 @@ function initGame(canvas){
 
   function render(time) {
     if (shipInfo) {
-      //ctx.clearRect(0, 0, screenSize.x, screenSize.y);
+      ctx.clearRect(0, 0, screenSize.x, screenSize.y);
 
       drawShip(ctx, shipInfo.pos, shipInfo.rot);
 
-      /*
-      var otherSide = foldPointOnScreen(pos);
+      var otherSide = foldPointOnScreen(shipInfo.pos);
 
       if (otherSide) {
-        drawShip(ctx, otherSide, curr[1]);
+        drawShip(ctx, otherSide, shipInfo.rot);
       }
-      */
     } 
     requestAnimationFrame(render);
+    _.defer(updateSimulation);
   };
 
   requestAnimationFrame(render);
-
-
-  /*
-  var positionKeys
-  function keyStream(keyCode) {
-    var isKey = eq(keyCode);
-    return allKeyUps.filter(isKey).map(timedValue(false))
-      .merge(
-        allKeyDowns.filter(isKey).map(timedValue(true))
-      ).distinctUntilChanged(function(pair) {
-        return pair[1];
-      });
-  };
-
-
-
-  var leftKey = keyStream(keyMap.left);
-  leftKey.subscribe(function(k) {
-    console.log(k)
-  });
-
-
-  var rightKey = keyStream(keyMap.right);
-  var thrustKey = keyStream(keyMap.thrust);
-
-
-
-  var inputStream = leftKey.combineLatest(rightKey, thrustKey,
-    function(l, r, t) {
-      return {
-        left: l,
-        right: r,
-        thrust: t,
-      };
-    }); 
-
-  var keys = null;
-  inputStream.subscribe(function(v) {
-    keys = v;
-  });
-
-  var timer = getTimer();
-
-  var rotSpeed = 0.003;
-  var ir = 0;
-
-  var rotation = timer.map(function(dt) {
-    var dr = 0;
-    if (keys.left) dr -= dt * rotSpeed;
-    if (keys.right) dr += dt * rotSpeed;
-    return dr;
-  }).scan(ir, function(rot, dr) {
-    return rot + dr;
-  });
-
-  var noAccel = {x:0, y:0};
-  var thrustSpeed = -0.002;
-
-  var maxSpeed = {x:0, y:-4};
-  var maxHyp = maxSpeed.y * maxSpeed.y;
-
-  var speed = timer.zip(rotation, function(dt, r) {
-    return keys.thrust ? rotatePoint({x: 0, y: thrustSpeed * dt}, r) : noAccel;
-  }).scan(noAccel, function(oldSpeed, accel) {
-    var s = translatePt(oldSpeed, accel);
-    var sHyp = s.x * s.x + s.y * s.y;
-    if (sHyp > maxHyp) {
-      var theta = Math.atan(s.x == 0 ? 0 : s.x/s.y);
-      newS = rotatePoint(maxSpeed, theta);
-      if (s.x * newS.x < 0 ) {
-        newS.x *= -1;
-      }
-
-      if (s.y * newS.y < 0 ) {
-        newS.y *= -1;
-      }
-
-      s = newS;
-    }
-
-    return s;
-  });
-
-  var iPos = {x:100, y:100};
-  var position = timer.zip(speed, function(dt, s) {
-    var dtScaled = dt/10;
-    return {x:s.x*dtScaled, y:s.y*dtScaled}
-  }).scan(iPos, function(oldPos, speed) {
-    var newPos = translatePt(oldPos, speed);
-    if (newPos.x < 0) newPos.x += screenSize.x;
-    if (newPos.x > screenSize.x) newPos.x -= screenSize.x;
-    if (newPos.y < 0) newPos.y += screenSize.y;
-    if (newPos.y > screenSize.y) newPos.y -= screenSize.y;
-    return newPos;
-  });
-
-  // info = [[newX, newY], newR]; 
-  var info = rotation.zip(position, function(r, pt) {
-    return [pt, r];
-  });
-
-
-  var drawInfo = null;
-  info.subscribe(function(v) {
-    drawInfo = v;
-  });
-
-
-  var oldTime = null;
-  function render(time) {
-    oldTime = time;
-    curr = drawInfo;
-    if (drawInfo) {
-      var curr = drawInfo;
-      drawInfo = null;
-
-      ctx.clearRect(0, 0, screenSize.x, screenSize.y);
-
-      drawShip(ctx, curr[0], curr[1]);
-      var pos = curr[0];
-
-      var otherSide = foldPointOnScreen(pos);
-
-      if (otherSide) {
-        drawShip(ctx, otherSide, curr[1]);
-      }
-    }
-    requestAnimationFrame(render);
-  };
-
-  requestAnimationFrame(render);
-  */
 }
 
 var tolerance = 20;
