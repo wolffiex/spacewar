@@ -75,33 +75,113 @@ function getTimer() {
 
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
-  var keyMap = {
-    'left'   : 37,
-    'thrust' : 38,
-    'right'  : 39,
+
+  var positionKeys = {
+    37: 'left',
+    38: 'thrust',
+    39: 'right',
   }
 
   // Get keyCode of first event
   var getKeyCode = function(args) {
     return args[0].keyCode;
   }
+  var keyUps = Rx.Observable.fromEvent(document, 'keyup', getKeyCode);
+  var keyDowns = Rx.Observable.fromEvent(document, 'keydown', getKeyCode);
 
-  var allKeyUps = Rx.Observable.fromEvent(document, 'keyup', getKeyCode);
-  var allKeyDowns = Rx.Observable.fromEvent(document, 'keydown', getKeyCode);
+  function isPositionKey(keyCode) {
+    return keyCode in positionKeys;
+  }
 
+  function keyMapper(isDown) {
+    return function(keyCode) {
+      return {
+        action: positionKeys[keyCode],
+        isDown: isDown,
+      };
+    }
+  }
+
+  var initialKeys = {
+    t: 0,
+    k: {
+      left: false,
+      thrust: false,
+      right: false,
+    },
+  };
+
+  var keyStream = keyUps.filter(isPositionKey).map(keyMapper(false))
+    .merge(keyDowns.filter(isPositionKey).map(keyMapper(true)))
+    .distinctUntilChanged(function(val){
+      return val.action + (val.isDown ? '1' : '0');
+    });
+
+  var actionStream = Rx.Observable.returnValue(initialKeys).concat(
+    keyStream.scan(initialKeys, function(old, input) {
+      var nextKeys = _.clone(old.k);
+      nextKeys[input.action] = input.isDown;
+      return {t: Date.now(), k: nextKeys};
+    }));
+
+  var initialShip = {
+    pos: {x: 100, y: 100},
+    speed: {x: 0, y: 0},
+    r: 0,
+  };
+
+  var inputPeriod = actionStream.bufferWithCount(2, 1).map(
+    function(keyStates) {
+      var oldState = keyStates[0];
+      var newState = keyStates[1];
+
+      return {
+        t: newState.t - oldState.t,
+        k: oldState.k,
+      };
+    });
+
+  inputPeriod.subscribe(function(k) {
+    console.log(k)
+  });
+
+
+
+  var ship = keyStream.scan(initialShip, function(oldShip, keyState) {
+    /*
+    keyState = {
+      dt: <time elapsed>,
+      keys : ...
+    }
+    */
+    var dt = oldSpeed.t - keyState
+  });
+
+
+  /*
+  var positionKeys
   function keyStream(keyCode) {
     var isKey = eq(keyCode);
-    return Rx.Observable.returnValue(false).concat(
-      allKeyUps.filter(isKey).map(constF(false))
-        .merge(
-          allKeyDowns.filter(isKey).map(constF(true))
-        ).distinctUntilChanged());
+    return allKeyUps.filter(isKey).map(timedValue(false))
+      .merge(
+        allKeyDowns.filter(isKey).map(timedValue(true))
+      ).distinctUntilChanged(function(pair) {
+        return pair[1];
+      });
   };
 
 
+
   var leftKey = keyStream(keyMap.left);
+  leftKey.subscribe(function(k) {
+    console.log(k)
+  });
+
+
   var rightKey = keyStream(keyMap.right);
   var thrustKey = keyStream(keyMap.thrust);
+
+
 
   var inputStream = leftKey.combineLatest(rightKey, thrustKey,
     function(l, r, t) {
@@ -208,6 +288,7 @@ function initGame(canvas){
   };
 
   requestAnimationFrame(render);
+  */
 }
 
 var tolerance = 20;
@@ -238,6 +319,6 @@ var eq = function(val) {
     return input == val;
   }
 }
-var constF = function(val) {
-  return function() {return val};
+var timedValue = function(val) {
+  return function() {return [Date.now(), val]};
 }
