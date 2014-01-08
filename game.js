@@ -161,11 +161,14 @@ function initGame(canvas){
   var initialShip = {
     pos: {x: 100, y: 100},
     spd: {x: 0, y: 0},
-    rot: 0,
+    rot: Math.PI,
   };
 
   var rotSpeed = 0.003;
   var thrustAccel = {x: 0.0001, y: 0};
+  var maxSpd = {x:0.4, y:0};
+  var maxSpdHyp = maxSpd.x * maxSpd.x;
+
   var ship = inputPeriod.scan(initialShip, function(oldShip, input) {
     var dt = input.dt;
     var rot = oldShip.rot;
@@ -191,6 +194,24 @@ function initGame(canvas){
 
         spdX += rotatePointX(thrustAccel, rot);
         spdY += rotatePointY(thrustAccel, rot);
+
+        if (spdX*spdX + spdY*spdY > maxSpdHyp) {
+          var theta = Math.atan(spdY/spdX);
+
+          var newSpdX = rotatePointX(maxSpd, theta);
+          var newSpdY = rotatePointY(maxSpd, theta);
+
+          if (spdX * newSpdX < 0 ) {
+            newSpdX *= -1;
+          }
+
+          if (spdY * newSpdY < 0 ) {
+            newSpdY *= -1;
+          }
+
+          spdX = newSpdX;
+          spdY = newSpdY;
+        }
       }
 
       spd = {x: spdX, y: spdY};
