@@ -55,30 +55,6 @@ function drawShip(ctx, pos, r) {
   ctx.fill();
 }
 
-function getTimer() {
-  var lastTime = Date.now();
-  var generator = Rx.Observable.generateWithRelativeTime(
-    Date.now(), 
-    constF(true),
-    function(nowTime) { 
-      lastTime = nowTime;
-      var nowTime = Date.now();
-      return nowTime;
-    },
-    function(nowTime) {
-      var diff = nowTime - lastTime;
-      return diff;
-    },
-    function() { return 10; }
-  );
-
-  var timer = generator.publish();
-  var connect = timer.connect();
-
-  return timer;
-
-}
-
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
 
@@ -108,6 +84,16 @@ function initGame(canvas){
     }
   }
 
+  var keyStream = keyUps.filter(isPositionKey).map(keyMapper(false))
+    .merge(keyDowns.filter(isPositionKey).map(keyMapper(true)))
+    .distinctUntilChanged(function(val){
+      // putting the filter here rather than on the action stream
+      // means that we end up creating some duplicate key states
+      // but this is harmless, and it saves object creation in the
+      // common case
+      return val.action + (val.isDown ? '1' : '0');
+    });
+
   var initialKeys = {
     t: 0,
     k: {
@@ -117,12 +103,6 @@ function initGame(canvas){
     },
   };
 
-  var keyStream = keyUps.filter(isPositionKey).map(keyMapper(false))
-    .merge(keyDowns.filter(isPositionKey).map(keyMapper(true)))
-    .distinctUntilChanged(function(val){
-      return val.action + (val.isDown ? '1' : '0');
-    });
-
   var actionStream = Rx.Observable.returnValue(initialKeys).concat(
     keyStream.scan(initialKeys, function(old, input) {
       var nextKeys = _.clone(old.k);
@@ -130,6 +110,9 @@ function initGame(canvas){
       return {t: Date.now(), k: nextKeys};
     }));
 
+  // When we push a time value onto the updateStream, it makes a new entry
+  // in the keyState stream for that time. This produces a new value for the
+  // ship position
   var updateObserver = null;
   var updateStream = Rx.Observable.create(function (observer) {
     updateObserver = observer;
@@ -145,6 +128,8 @@ function initGame(canvas){
     if (updateObserver) updateObserver.onNext(Date.now());
   }
 
+  // Elements of the inputPeriod stream are slices of time when
+  // the input state was stable. This drives the simulation.
   var inputPeriod = updateStream.bufferWithCount(2, 1).map(
     function(keyStates) {
       var oldState = keyStates[0];
@@ -176,8 +161,8 @@ function initGame(canvas){
     var spd = oldShip.spd;
 
     if (input.k.thrust) {
-      // This is easier for to express as a simulation than
-      // a continuous function, but I suck at math
+      // It might be better to express this as continuous function rather than a
+      // discrete simulation, but I suck at math
       var spdX = spd.x;
       var spdY = spd.y;
 
@@ -185,6 +170,8 @@ function initGame(canvas){
       var posY = pos.y;
 
 
+      // For every millisecond, we're just going to simulate
+      // what happened
       for (var i = 0; i  < dt; i++) {
         if (input.k.left)  rot -= rotSpeed;
         if (input.k.right) rot += rotSpeed;
@@ -195,6 +182,8 @@ function initGame(canvas){
         spdX += rotatePointX(thrustAccel, rot);
         spdY += rotatePointY(thrustAccel, rot);
 
+        // Limit speed by scaling the speed vector if
+        // necessary
         if (spdX*spdX + spdY*spdY > maxSpdHyp) {
           var theta = Math.atan(spdY/spdX);
 
@@ -217,6 +206,8 @@ function initGame(canvas){
       spd = {x: spdX, y: spdY};
       pos = {x: posX, y: posY};
     } else {
+      // When the thrusters are off, the continuous
+      // function is easy
       if (input.k.left)  rot -= dt*rotSpeed;
       if (input.k.right) rot += dt*rotSpeed;
       
@@ -227,6 +218,7 @@ function initGame(canvas){
 
     }
 
+    // Screen wrapping
     if (pos.x < 0) pos.x += screenSize.x;
     if (pos.x > screenSize.x) pos.x -= screenSize.x;
     if (pos.y < 0) pos.y += screenSize.y;
@@ -283,15 +275,4 @@ function foldPointOnScreen(pt) {
   }
 
   return foldedPt;
-}
-
-var isNonZero = function(v) {return v != 0;};
-
-var eq = function(val) {
-  return function(input) {
-    return input == val;
-  }
-}
-var timedValue = function(val) {
-  return function() {return [Date.now(), val]};
 }
