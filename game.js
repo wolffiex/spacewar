@@ -110,22 +110,76 @@ function initGame(canvas){
       return {t: Date.now(), k: nextKeys};
     }));
 
+  function isShotKey(keyCode) {
+    return keyCode == 32;
+  }
+
+  function shotKeyMapper(isDown) {
+    return function() {
+      return {t: Date.now(), s: isDown};
+    }
+  }
+  var SHOTS = {
+    max : 8,
+    delay: 200,
+    life: 2000,
+  };
+
+  var shotKeys = Rx.Observable.returnValue({t:0, s:false}).concat(
+    keyUps.filter(isShotKey).map(shotKeyMapper(false))
+    .merge(keyDowns.filter(isShotKey).map(shotKeyMapper(true)))
+    .distinctUntilChanged(function(val){
+      return val.s;
+    }));
+  // maybe the thing to do is to just emit all the shots when the shot
+  // key goes down and the use buffering and stuff to inject them into the
+  // update stream
+  /*
+
+        shot1
+    up1 --    
+        shot2
+
+        shot3
+    up2 --    
+        shot4
+  
+
+    /*
+    scan([], function(oldShots, input) {
+      // first truncate the existing list to the current time
+      // and remove any old shots
+      var nextShots = oldShots.filter(function(t) {
+        return t < input.t && t + SHOTS.life > input.t;
+      });
+
+      if (!input.s) return nextShots;
+
+      // now if key is down, add shots to fill
+      return nextShots.concat(_.range(0, SHOTS.max-oldShots.length).map(function (i) {
+        return input.t + i * SHOTS.delay;
+      }));
+
+    });
+    */
+
+  shotKeys.subscribe(function(v){ console.log(v)});
+
   // When we push a time value onto the updateStream, it makes a new entry
   // in the keyState stream for that time. This produces a new value for the
   // ship position
-  var updateObserver = null;
-  var updateStream = Rx.Observable.create(function (observer) {
-    updateObserver = observer;
-  }).combineLatest(actionStream, function(updateTime, lastAction) {
-    return lastAction.t > updateTime ? 
-      lastAction : {
-        t: updateTime,
-        k: lastAction.k,
-      };
-  });
+  var updater = new Rx.Subject();
+  var updateStream = updater.combineLatest(actionStream, 
+    function(updateTime, lastAction) {
+      return lastAction.t > updateTime ? 
+        lastAction : {
+          t: updateTime,
+          k: lastAction.k,
+        };
+    });
   
   function updateSimulation() {
-    if (updateObserver) updateObserver.onNext(Date.now());
+    updater.onNext(Date.now());
   }
 
   // Elements of the inputPeriod stream are slices of time when
