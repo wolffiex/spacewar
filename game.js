@@ -125,28 +125,12 @@ function initGame(canvas){
     life: 2000,
   };
 
-  var shotKeys = Rx.Observable.returnValue({t:0, s:false}).concat(
+  var shotTimes = Rx.Observable.returnValue({t:0, s:false}).concat(
     keyUps.filter(isShotKey).map(shotKeyMapper(false))
     .merge(keyDowns.filter(isShotKey).map(shotKeyMapper(true)))
     .distinctUntilChanged(function(val){
       return val.s;
-    }));
-  // maybe the thing to do is to just emit all the shots when the shot
-  // key goes down and the use buffering and stuff to inject them into the
-  // update stream
-  /*
-
-        shot1
-    up1 --    
-        shot2
-
-        shot3
-    up2 --    
-        shot4
-  
-
-    /*
-    scan([], function(oldShots, input) {
+    })).scan([], function(oldShots, input) {
       // first truncate the existing list to the current time
       // and remove any old shots
       var nextShots = oldShots.filter(function(t) {
@@ -156,14 +140,11 @@ function initGame(canvas){
       if (!input.s) return nextShots;
 
       // now if key is down, add shots to fill
-      return nextShots.concat(_.range(0, SHOTS.max-oldShots.length).map(function (i) {
+      return nextShots.concat(_.range(0, SHOTS.max-nextShots.length).map(function (i) {
         return input.t + i * SHOTS.delay;
       }));
 
     });
-    */
-
-  shotKeys.subscribe(function(v){ console.log(v)});
 
   // When we push a time value onto the updateStream, it makes a new entry
   // in the keyState stream for that time. This produces a new value for the
@@ -171,13 +152,12 @@ function initGame(canvas){
   var updater = new Rx.Subject();
   var updateStream = updater.combineLatest(actionStream, 
     function(updateTime, lastAction) {
-      return lastAction.t > updateTime ? 
-        lastAction : {
-          t: updateTime,
-          k: lastAction.k,
-        };
+      return lastAction.t > updateTime ?  lastAction : {
+        t: updateTime,
+        k: lastAction.k,
+      };
     });
-  
+
   function updateSimulation() {
     updater.onNext(Date.now());
   }
@@ -190,101 +170,33 @@ function initGame(canvas){
       var newState = keyStates[1];
 
       return {
-        dt: newState.t - oldState.t,
+        t: newState.t,
+        tLast: oldState.t,
         k: oldState.k,
       };
     });
 
+  var shotStream = shotTimes.combineLatest(inputPeriod,
+    function(shotList, input) {
+      return _.filter(shotList, function(shotTime) {
+        return shotTime > input.tLast && shotTime < input.t;
+      });
+    }).flatMap(function(ar) {
+      return Rx.Observable.fromArray(ar);
+    });
+
+
+  shotStream.subscribe(function(v){ console.log(v)});
 
 
   var initialShip = {
+    t: 0,
     pos: {x: 100, y: 100},
     spd: {x: 0, y: 0},
     rot: Math.PI,
   };
 
-  var rotSpeed = 0.003;
-  var thrustAccel = {x: 0.0001, y: 0};
-  var maxSpd = {x:0.4, y:0};
-  var maxSpdHyp = maxSpd.x * maxSpd.x;
-
-  var ship = inputPeriod.scan(initialShip, function(oldShip, input) {
-    var dt = input.dt;
-    var rot = oldShip.rot;
-    var pos = oldShip.pos;
-    var spd = oldShip.spd;
-
-    if (input.k.thrust) {
-      // It might be better to express this as continuous function rather than a
-      // discrete simulation, but I suck at math
-      var spdX = spd.x;
-      var spdY = spd.y;
-
-      var posX = pos.x;
-      var posY = pos.y;
-
-
-      // For every millisecond, we're just going to simulate
-      // what happened
-      for (var i = 0; i  < dt; i++) {
-        if (input.k.left)  rot -= rotSpeed;
-        if (input.k.right) rot += rotSpeed;
-
-        posX += spdX;
-        posY += spdY;
-
-        spdX += rotatePointX(thrustAccel, rot);
-        spdY += rotatePointY(thrustAccel, rot);
-
-        // Limit speed by scaling the speed vector if
-        // necessary
-        if (spdX*spdX + spdY*spdY > maxSpdHyp) {
-          var theta = Math.atan(spdY/spdX);
-
-          var newSpdX = rotatePointX(maxSpd, theta);
-          var newSpdY = rotatePointY(maxSpd, theta);
-
-          if (spdX * newSpdX < 0 ) {
-            newSpdX *= -1;
-          }
-
-          if (spdY * newSpdY < 0 ) {
-            newSpdY *= -1;
-          }
-
-          spdX = newSpdX;
-          spdY = newSpdY;
-        }
-      }
-
-      spd = {x: spdX, y: spdY};
-      pos = {x: posX, y: posY};
-    } else {
-      // When the thrusters are off, the continuous
-      // function is easy
-      if (input.k.left)  rot -= dt*rotSpeed;
-      if (input.k.right) rot += dt*rotSpeed;
-      
-      pos = {
-        x: oldShip.pos.x + dt * oldShip.spd.x,
-        y: oldShip.pos.y + dt * oldShip.spd.y,
-      };
-
-    }
-
-    // Screen wrapping
-    if (pos.x < 0) pos.x += screenSize.x;
-    if (pos.x > screenSize.x) pos.x -= screenSize.x;
-    if (pos.y < 0) pos.y += screenSize.y;
-    if (pos.y > screenSize.y) pos.y -= screenSize.y;
-
-
-    return {
-      pos: pos,
-      rot: rot,
-      spd: spd,
-    }
-  });
+  var ship = inputPeriod.scan(initialShip, applyInputToShip);
 
   var shipInfo = null;
   ship.subscribe(function(k) {
@@ -308,6 +220,88 @@ function initGame(canvas){
   };
 
   requestAnimationFrame(render);
+}
+
+var rotSpeed = 0.003;
+var thrustAccel = {x: 0.0001, y: 0};
+var maxSpd = {x:0.4, y:0};
+var maxSpdHyp = maxSpd.x * maxSpd.x;
+function applyInputToShip (oldShip, input) {
+  var dt = input.t - input.tLast;
+  var rot = oldShip.rot;
+  var pos = oldShip.pos;
+  var spd = oldShip.spd;
+
+  if (input.k.thrust) {
+    // It might be better to express this as continuous function rather than a
+    // discrete simulation, but I suck at math
+    var spdX = spd.x;
+    var spdY = spd.y;
+
+    var posX = pos.x;
+    var posY = pos.y;
+
+
+    // For every millisecond, we're just going to simulate
+    // what happened
+    for (var i = 0; i  < dt; i++) {
+      if (input.k.left)  rot -= rotSpeed;
+      if (input.k.right) rot += rotSpeed;
+
+      posX += spdX;
+      posY += spdY;
+
+      spdX += rotatePointX(thrustAccel, rot);
+      spdY += rotatePointY(thrustAccel, rot);
+
+      // Limit speed by scaling the speed vector if
+      // necessary
+      if (spdX*spdX + spdY*spdY > maxSpdHyp) {
+        var theta = Math.atan(spdY/spdX);
+
+        var newSpdX = rotatePointX(maxSpd, theta);
+        var newSpdY = rotatePointY(maxSpd, theta);
+
+        if (spdX * newSpdX < 0 ) {
+          newSpdX *= -1;
+        }
+
+        if (spdY * newSpdY < 0 ) {
+          newSpdY *= -1;
+        }
+
+        spdX = newSpdX;
+        spdY = newSpdY;
+      }
+    }
+
+    spd = {x: spdX, y: spdY};
+    pos = {x: posX, y: posY};
+  } else {
+    // When the thrusters are off, the continuous
+    // function is easy
+    if (input.k.left)  rot -= dt*rotSpeed;
+    if (input.k.right) rot += dt*rotSpeed;
+    
+    pos = {
+      x: oldShip.pos.x + dt * oldShip.spd.x,
+      y: oldShip.pos.y + dt * oldShip.spd.y,
+    };
+
+  }
+
+  // Screen wrapping
+  if (pos.x < 0) pos.x += screenSize.x;
+  if (pos.x > screenSize.x) pos.x -= screenSize.x;
+  if (pos.y < 0) pos.y += screenSize.y;
+  if (pos.y > screenSize.y) pos.y -= screenSize.y;
+
+
+  return {
+    pos: pos,
+    rot: rot,
+    spd: spd,
+  }
 }
 
 var tolerance = 20;
