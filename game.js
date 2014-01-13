@@ -309,7 +309,7 @@ function drawShots(ctx, shotList) {
 }
 
 var rotSpeed = 0.003;
-var thrustAccel = {x: 0.0001, y: 0};
+var thrustAccel = {x: 0.0002, y: 0};
 var maxSpd = {x:0.4, y:0};
 var maxSpdHyp = maxSpd.x * maxSpd.x;
 function applyInputToShip (oldShip, input) {
