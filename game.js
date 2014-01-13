@@ -180,7 +180,7 @@ function initGame(canvas){
 
   var SHOTS = {
     max : 8,
-    delay: 100,
+    delay: 200,
     life: 2000,
     accel: {x: 0.1, y: 0},
   };
@@ -201,10 +201,10 @@ function initGame(canvas){
       // this to publish
       if (diff < 0) throw "Unexpected time difference";
 
-      var lastShotTime = currShip.t - diff % SHOTS.delay;
+      var shotTime = currShip.t - diff % SHOTS.delay;
 
       // Bail if last shot doesn't fall in this window
-      if (lastShotTime <= lastShip.t) return null;
+      if (shotTime <= lastShip.t) return null;
 
       //console.log(lastShip, currShip, shotKeyState)
 
@@ -217,7 +217,7 @@ function initGame(canvas){
       // higher fidelity implementation woiuld be to examine the key states
       // and use the function to calculate the ship state directly
 
-      var shot =  averageBodies(lastShip, currShip, lastShotTime);
+      var shot =  averageBodies(lastShip, currShip, shotTime);
       shot.spd.x += rotatePointX(SHOTS.accel, shot.rot);
       shot.spd.y += rotatePointY(SHOTS.accel, shot.rot);
       return shot;
@@ -263,8 +263,13 @@ function initGame(canvas){
 function drawShots(ctx, shotList) {
   shotList.forEach(function(shot) {
     //console.log('a', shot)
-    var x = shot.pos.x;
-    var y = shot.pos.y;
+    var dt = Date.now() - shot.t;
+    var x = shot.pos.x + shot.spd.x * dt;;
+    var y = shot.pos.y + shot.spd.y * dt;;
+    x = x % screenSize.x;
+    y = y % screenSize.y;
+    if (x < 0) x += screenSize.x;
+    if (y < 0) y += screenSize.y;
     ctx.beginPath();
     ctx.arc(x, y, 2, 0, Math.PI*2, true); 
     ctx.closePath();
@@ -389,6 +394,7 @@ function averageBodies(d0, d1, t) {
     t: t,
     rot: d0.rot + (dr/dt) * timePeriod,
   };
+
   posAndSpd.forEach(function(k) {
     var dt = d1.t - d0.t;
     var dx = d1[k].x - d0[k].x;
