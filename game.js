@@ -103,12 +103,16 @@ function initGame(canvas){
     },
   };
 
-  var actionStream = Rx.Observable.returnValue(initialKeys).concat(
-    keyStream.scan(initialKeys, function(old, input) {
+  var _actionStream = keyStream.scan(initialKeys, function(old, input) {
       var nextKeys = _.clone(old.k);
       nextKeys[input.action] = input.isDown;
       return {t: Date.now(), k: nextKeys};
-    }));
+    }).publish();
+
+  _actionStream.connect();
+
+  var actionStream = Rx.Observable.returnValue(initialKeys)
+    .concat(_actionStream);
 
   function isShotKey(keyCode) {
     return keyCode == 32;
@@ -116,44 +120,32 @@ function initGame(canvas){
 
   function shotKeyMapper(isDown) {
     return function() {
-      return {t: Date.now(), s: isDown};
+      return {t: Date.now(), s: isDown, u: Math.random()};
     }
   }
-  var SHOTS = {
-    max : 8,
-    delay: 200,
-    life: 2000,
-  };
 
-  var shotTimes = Rx.Observable.returnValue({t:0, s:false}).concat(
-    keyUps.filter(isShotKey).map(shotKeyMapper(false))
+  function constF(val) {
+    return function(){ return val; };
+  }
+
+  var _shotKeys = keyUps.filter(isShotKey).map(shotKeyMapper(false))
     .merge(keyDowns.filter(isShotKey).map(shotKeyMapper(true)))
     .distinctUntilChanged(function(val){
       return val.s;
-    })).scan([], function(oldShots, input) {
-      // first truncate the existing list to the current time
-      // and remove any old shots
-      var nextShots = oldShots.filter(function(t) {
-        return t < input.t && t + SHOTS.life > input.t;
-      });
+    }).publish();
 
-      if (!input.s) return nextShots;
-
-      // now if key is down, add shots to fill
-      return nextShots.concat(_.range(0, SHOTS.max-nextShots.length).map(function (i) {
-        return input.t + i * SHOTS.delay;
-      }));
-
-    });
+  _shotKeys.connect();
+  shotKeys = Rx.Observable.returnValue({t:0, s:false}).concat(_shotKeys);
 
   // When we push a time value onto the updateStream, it makes a new entry
   // in the keyState stream for that time. This produces a new value for the
   // ship position
   var updater = new Rx.Subject();
-  var updateStream = updater.combineLatest(actionStream, 
-    function(updateTime, lastAction) {
-      return lastAction.t > updateTime ?  lastAction : {
-        t: updateTime,
+  var updateStream = updater.combineLatest(actionStream, shotKeys,
+    function(updateTime, lastAction, shotKeyState) {
+      var t = Math.max(lastAction.t, updateTime, shotKeyState.t);
+      return {
+        t: t,
         k: lastAction.k,
       };
     });
@@ -171,23 +163,9 @@ function initGame(canvas){
 
       return {
         t: newState.t,
-        tLast: oldState.t,
         k: oldState.k,
       };
     });
-
-  var shotStream = shotTimes.combineLatest(inputPeriod,
-    function(shotList, input) {
-      return _.filter(shotList, function(shotTime) {
-        return shotTime > input.tLast && shotTime < input.t;
-      });
-    }).flatMap(function(ar) {
-      return Rx.Observable.fromArray(ar);
-    });
-
-
-  shotStream.subscribe(function(v){ console.log(v)});
-
 
   var initialShip = {
     t: 0,
@@ -196,23 +174,83 @@ function initGame(canvas){
     rot: Math.PI,
   };
 
+  var initialShots = [];
+
   var ship = inputPeriod.scan(initialShip, applyInputToShip);
 
-  var shipInfo = null;
+  var SHOTS = {
+    max : 8,
+    delay: 100,
+    life: 2000,
+    accel: {x: 0.1, y: 0},
+  };
+
+  var shotEmitter = ship.bufferWithCount(2,1).combineLatest(shotKeys,
+    function(shipStates, shotKeyState) {
+      if (!shotKeyState.s) return null;
+
+      var lastShip = shipStates[0];
+      var currShip = shipStates[1];
+
+      // Does a shot repetition fall within the interval?
+      // lastShip.t - now
+      var diff = currShip.t - shotKeyState.t;
+
+      // I think this was fixed by publish()ing the key streams
+      // but the behavior was unexpected here before I changed
+      // this to publish
+      if (diff < 0) throw "Unexpected time difference";
+
+      var lastShotTime = currShip.t - diff % SHOTS.delay;
+
+      // Bail if last shot doesn't fall in this window
+      if (lastShotTime <= lastShip.t) return null;
+
+      //console.log(lastShip, currShip, shotKeyState)
+
+      // This is an optimization, but here we assume that the render
+      // period is shorter than the shot period. That is, we never
+      // create two shots in a single render tick
+      
+      // This could be more awesome, but for now we just average the ship
+      // states over the interval to take the shot position and speed. A
+      // higher fidelity implementation woiuld be to examine the key states
+      // and use the function to calculate the ship state directly
+
+      var shot =  averageBodies(lastShip, currShip, lastShotTime);
+      shot.spd.x += rotatePointX(SHOTS.accel, shot.rot);
+      shot.spd.y += rotatePointY(SHOTS.accel, shot.rot);
+      return shot;
+    }).filter(function(shot) {
+      return !!shot;
+    });
+
+  var shots = shotEmitter.bufferWithCount(8, 1);
+
+
+  var renderInfo = {shots:[]};
   ship.subscribe(function(k) {
-    shipInfo = k;
+    renderInfo.ship = k;
   });
 
+  shots.subscribe(function(k) {
+    //console.log(k)
+    renderInfo.shots = k;
+  });
+
+
   function render(time) {
-    if (shipInfo) {
+    if (renderInfo.ship) {
+      var ship = renderInfo.ship;
       ctx.clearRect(0, 0, screenSize.x, screenSize.y);
 
-      drawShip(ctx, shipInfo.pos, shipInfo.rot);
+      drawShip(ctx, ship.pos, ship.rot);
+      if (renderInfo.shots.length) drawShots(ctx, renderInfo.shots);
 
-      var otherSide = foldPointOnScreen(shipInfo.pos);
+      var otherSide = foldPointOnScreen(ship.pos);
 
       if (otherSide) {
-        drawShip(ctx, otherSide, shipInfo.rot);
+        drawShip(ctx, otherSide, ship.rot);
       }
     } 
     requestAnimationFrame(render);
@@ -222,12 +260,24 @@ function initGame(canvas){
   requestAnimationFrame(render);
 }
 
+function drawShots(ctx, shotList) {
+  shotList.forEach(function(shot) {
+    //console.log('a', shot)
+    var x = shot.pos.x;
+    var y = shot.pos.y;
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, Math.PI*2, true); 
+    ctx.closePath();
+    ctx.fill();
+  });
+}
+
 var rotSpeed = 0.003;
 var thrustAccel = {x: 0.0001, y: 0};
 var maxSpd = {x:0.4, y:0};
 var maxSpdHyp = maxSpd.x * maxSpd.x;
 function applyInputToShip (oldShip, input) {
-  var dt = input.t - input.tLast;
+  var dt = input.t - oldShip.t;
   var rot = oldShip.rot;
   var pos = oldShip.pos;
   var spd = oldShip.spd;
@@ -301,6 +351,7 @@ function applyInputToShip (oldShip, input) {
     pos: pos,
     rot: rot,
     spd: spd,
+    t: input.t,
   }
 }
 
@@ -323,4 +374,36 @@ function foldPointOnScreen(pt) {
   }
 
   return foldedPt;
+}
+
+var posAndSpd = ['pos', 'spd'];
+function averageBodies(d0, d1, t) {
+  // NEXT: Average rotation for ship
+  var dt = t - d0.t;
+  if (dt < 0) throw "Point average underflow";
+  if (d0.t + dt > d1.t) throw "Point average overflow";
+
+  var timePeriod = d1.t - d0.t;
+  var dr = d1.rot - d0.rot;
+  var r = {
+    t: t,
+    rot: d0.rot + (dr/dt) * timePeriod,
+  };
+  posAndSpd.forEach(function(k) {
+    var dt = d1.t - d0.t;
+    var dx = d1[k].x - d0[k].x;
+    var dy = d1[k].y - d0[k].y;
+
+    var incX = dx/timePeriod;
+    var incY = dy/timePeriod;
+    //console.log(k, dx, dy, timePeriod, incX, incY, d0[k].x, d0[k].y)
+
+    r[k] = {
+      x: d0[k].x + incX*dt,
+      y: d0[k].y + incY*dt,
+    };
+  });
+  
+  //console.log(timePeriod, r);
+  return r;
 }
