@@ -10,6 +10,8 @@ var shipPoly = [
   {x:  -15, y:  -10},
 ];
 
+var shipNose = shipPoly[0];
+
 function rotatePoint(pt, r) {
   return { 
     x: pt.x * Math.cos(r) - pt.y * Math.sin(r),
@@ -181,8 +183,8 @@ function initGame(canvas){
   var SHOTS = {
     max : 8,
     delay: 200,
-    life: 2000,
-    accel: {x: 0.1, y: 0},
+    life: 3000,
+    accel: {x: 0.2, y: 0},
   };
 
   var shotEmitter = ship.bufferWithCount(2,1).combineLatest(shotKeys,
@@ -206,8 +208,6 @@ function initGame(canvas){
       // Bail if last shot doesn't fall in this window
       if (shotTime <= lastShip.t) return null;
 
-      //console.log(lastShip, currShip, shotKeyState)
-
       // This is an optimization, but here we assume that the render
       // period is shorter than the shot period. That is, we never
       // create two shots in a single render tick
@@ -218,6 +218,9 @@ function initGame(canvas){
       // and use the function to calculate the ship state directly
 
       var shot =  averageBodies(lastShip, currShip, shotTime);
+      shot.pos.x += rotatePointX(shipNose, shot.rot);
+      shot.pos.y += rotatePointY(shipNose, shot.rot);
+
       shot.spd.x += rotatePointX(SHOTS.accel, shot.rot);
       shot.spd.y += rotatePointY(SHOTS.accel, shot.rot);
       return shot;
@@ -225,34 +228,63 @@ function initGame(canvas){
       return !!shot;
     });
 
-  var shots = shotEmitter.bufferWithCount(8, 1);
+  // Interesting, the shotStream should conceptually just be the list of every
+  // shot, but we can trim it here and it seems like it will be much more
+  // efficient
+  var shotStream = shotEmitter.scan([], function(_shotList, nextShot) {
+    var t = nextShot.t;
+    var shotList = _.filter(_shotList, function(shot) {
+      return t - shot.t < SHOTS.life;
+    });
+    if (shotList.length < SHOTS.max) shotList.push(nextShot);
+    return shotList;
+  });
+
+  var EMPTY_LIST = [];
+  var shots = shotStream.combineLatest(updater, function(shotList, t) {
+    if (!shotList.length) return shotList;
+    var firstShot = shotList[0];
+
+    // Optimization for last shot is old
+    var lastShot = _.last(shotList);
+    if (t - lastShot.t > SHOTS.life) return EMPTY_LIST;
+
+    // or first shot is young
+    if (t - firstShot.t < SHOTS.life) return shotList;
+
+    return _.filter(shotList, function(shot) {
+      return t - shot.t < SHOTS.life;
+    });
+  });
 
 
-  var renderInfo = {shots:[]};
+  var renderInfo = {ship: null, shots:[]};
   ship.subscribe(function(k) {
     renderInfo.ship = k;
   });
 
   shots.subscribe(function(k) {
-    //console.log(k)
     renderInfo.shots = k;
   });
 
 
   function render(time) {
-    if (renderInfo.ship) {
-      var ship = renderInfo.ship;
-      ctx.clearRect(0, 0, screenSize.x, screenSize.y);
+    var ship = renderInfo.ship;
+    var shots = renderInfo.shots;
 
+    ctx.clearRect(0, 0, screenSize.x, screenSize.y);
+
+    if (ship) {
       drawShip(ctx, ship.pos, ship.rot);
-      if (renderInfo.shots.length) drawShots(ctx, renderInfo.shots);
-
       var otherSide = foldPointOnScreen(ship.pos);
 
       if (otherSide) {
         drawShip(ctx, otherSide, ship.rot);
       }
-    } 
+    }
+
+    if (shots.length) drawShots(ctx, renderInfo.shots);
+
     requestAnimationFrame(render);
     _.defer(updateSimulation);
   };
@@ -262,7 +294,6 @@ function initGame(canvas){
 
 function drawShots(ctx, shotList) {
   shotList.forEach(function(shot) {
-    //console.log('a', shot)
     var dt = Date.now() - shot.t;
     var x = shot.pos.x + shot.spd.x * dt;;
     var y = shot.pos.y + shot.spd.y * dt;;
@@ -402,7 +433,6 @@ function averageBodies(d0, d1, t) {
 
     var incX = dx/timePeriod;
     var incY = dy/timePeriod;
-    //console.log(k, dx, dy, timePeriod, incX, incY, d0[k].x, d0[k].y)
 
     r[k] = {
       x: d0[k].x + incX*dt,
@@ -410,6 +440,5 @@ function averageBodies(d0, d1, t) {
     };
   });
   
-  //console.log(timePeriod, r);
   return r;
 }
