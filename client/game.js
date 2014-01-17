@@ -160,19 +160,27 @@ function initGame(canvas){
           y : ship.spd.y + Point.rotateY(SHOTS.accel, r),
         },
       };
+    }).filter(v => !!v)
+    .scan([], function(shotList, nextShot) {
+      if (!nextShot) return shotList;
+      // Interesting, the shotStream should conceptually just be the list of every
+      // shot, but we can trim it here and it seems like it will be much more
+      // efficient
+      var t = nextShot.t;
+      var shotList = _.filter(shotList, function(shot) {
+        return t - shot.t < SHOTS.life;
+      });
+      if (shotList.length < SHOTS.max) shotList.push(nextShot);
+      return shotList;
     });
-  
-  shotStream.subscribe(x => console.log(x));
 
-  //FIXME
-  /*
-  var shotStream = shotTimes.scan([], function(shotList, t) {
+  var activeShots = shotStream.combineLatest(updater, function(shotList, t) {
     if (!shotList.length) return shotList;
     var firstShot = shotList[0];
 
     // Optimization for last shot is old
     var lastShot = _.last(shotList);
-    if (t - lastShot.t > SHOTS.life) return EMPTY_LIST;
+    if (t - lastShot.t > SHOTS.life) return [];
 
     // or first shot is young
     if (t - firstShot.t < SHOTS.life) return shotList;
@@ -181,19 +189,15 @@ function initGame(canvas){
       return t - shot.t < SHOTS.life;
     });
   });
-  */
-
 
   var renderInfo = {ship: null, shots:[]};
   shipStream.subscribe(function(k) {
     renderInfo.ship = k;
   });
 
-  /*
-  shots.subscribe(function(k) {
+  activeShots.subscribe(function(k) {
     renderInfo.shots = k;
   });
-  */
 
 
   function render(time) {
@@ -220,7 +224,9 @@ function initGame(canvas){
   requestAnimationFrame(render);
 }
 
+var ods = null;
 function drawShots(ctx, shotList) {
+  ods = shotList;
   shotList.forEach(function(shot) {
     var dt = Date.now() - shot.t;
     var x = shot.pos.x + shot.spd.x * dt;;
