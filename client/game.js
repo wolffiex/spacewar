@@ -1,3 +1,12 @@
+var Rx = require('./rx/rx.js');
+require('./rx/rx.aggregates');
+require('./rx/rx.async');
+require('./rx/rx.binding');
+require('./rx/rx.coincidence');
+require('./rx/rx.time');
+
+var _ = require('./underscore');
+
 var screenSize = {
   x: 800,
   y: 400, 
@@ -442,3 +451,5 @@ function averageBodies(d0, d1, t) {
   
   return r;
 }
+
+global.initGame = initGame;
