@@ -10,6 +10,8 @@ var _ = require('./underscore');
 var shipF = require('./ship');
 var Point = require('./Point');
 
+var tick = () => Rx.Observable.timer(0);
+
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
 
@@ -97,27 +99,27 @@ function initGame(canvas){
     accel: {x: 0.2, y: 0},
   };
 
+  var updateWithFirstShots = updater.merge(
+    shotKeys.map(key => key.s ? key.t : null).filter(v=>!!v));
+
   var shotTimes = updater.combineLatest(shotKeys,
-    function(t, shotKeyState) {
-      if (!shotKeyState.s) return null;
+    function(t, key) {
+      if (!key.s) return null;
 
-      var sT = shotKeyState.t;
+      var sT = key.t;
 
-      // First shot
-      if (sT > t) return sT;
-
-      // Does a shot repetition fall within the interval?
-      var diff = t - shotKeyState.t;
+      var diff = t - key.t;
 
       var lastShotTime = t - diff % SHOTS.delay;
 
       return lastShotTime;
     }).filter(v => !!v).distinctUntilChanged();
 
-  var updateStream = updater.merge(shotTimes)
-    .combineLatest(actionStream, shotKeys,
-      function(updateTime, lastAction, shotKeyState) {
-        var t = Math.max(lastAction.t, updateTime, shotKeyState.t);
+
+  var updateStream = shotTimes.merge(updater)
+    .combineLatest(actionStream,
+      function(updateTime, lastAction) {
+        var t = Math.max(lastAction.t, updateTime);
         return {
           t: t,
           k: lastAction.k,
@@ -142,22 +144,23 @@ function initGame(canvas){
 
   var shipStream = inputPeriod.scan(initialShip, shipF.applyInput);
 
-  var shotStream = shotTimes.combineLatest(shipStream, function (shotT, ship) {
-    if (shotT != ship.t) return null;
-    var r = ship.rot;
-    return {
-      t: shotT,
-      rot: r,
-      pos : {
-        x : ship.pos.x + Point.rotateX(shipF.nose, r),
-        y : ship.pos.y + Point.rotateY(shipF.nose, r),
-      },
-      spd : {
-        x : ship.spd.x += Point.rotateX(SHOTS.accel, r),
-        y : ship.spd.y += Point.rotateY(SHOTS.accel, r),
-      },
-    }
-  }).filter(v => !!v);
+  var shotStream = shotTimes.join(shipStream, tick, tick, function (shotT, ship) {
+      if (shotT != ship.t) return null;
+
+      var r = ship.rot;
+      return {
+        t: shotT,
+        rot: r,
+        pos : {
+          x : ship.pos.x + Point.rotateX(shipF.nose, r),
+          y : ship.pos.y + Point.rotateY(shipF.nose, r),
+        },
+        spd : {
+          x : ship.spd.x + Point.rotateX(SHOTS.accel, r),
+          y : ship.spd.y + Point.rotateY(SHOTS.accel, r),
+        },
+      };
+    });
   
   shotStream.subscribe(x => console.log(x));
 

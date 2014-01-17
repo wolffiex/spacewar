@@ -38,6 +38,7 @@ var maxSpd = {x:0.4, y:0};
 var maxSpdHyp = maxSpd.x * maxSpd.x;
 function applyInput(oldShip, input) {
   var dt = input.t - oldShip.t;
+  if (dt < 0) throw "Reverse time for input";
   var rot = oldShip.rot;
   var pos = oldShip.pos;
   var spd = oldShip.spd;
