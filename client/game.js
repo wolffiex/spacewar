@@ -20,15 +20,12 @@ function initGame(canvas){
   }
 
   // Get keyCode of first event
-  var getKeyCode = function(args) {
-    return args[0].keyCode;
-  }
+  var getKeyCode = args => args[0].keyCode;
+
   var keyUps = Rx.Observable.fromEvent(document, 'keyup', getKeyCode);
   var keyDowns = Rx.Observable.fromEvent(document, 'keydown', getKeyCode);
 
-  function isPositionKey(keyCode) {
-    return keyCode in positionKeys;
-  }
+  var isPositionKey = keyCode => keyCode in positionKeys;
 
   function keyMapper(isDown) {
     return function(keyCode) {
@@ -79,15 +76,10 @@ function initGame(canvas){
     }
   }
 
-  function constF(val) {
-    return function(){ return val; };
-  }
-
   var _shotKeys = keyUps.filter(isShotKey).map(shotKeyMapper(false))
     .merge(keyDowns.filter(isShotKey).map(shotKeyMapper(true)))
-    .distinctUntilChanged(function(val){
-      return val.s;
-    }).publish();
+    .distinctUntilChanged(val => val.s)
+    .publish();
 
   _shotKeys.connect();
   shotKeys = Rx.Observable.returnValue({t:0, s:false}).concat(_shotKeys);
