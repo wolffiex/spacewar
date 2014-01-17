@@ -28,12 +28,10 @@ function initGame(canvas){
   var isPositionKey = keyCode => keyCode in positionKeys;
 
   function keyMapper(isDown) {
-    return function(keyCode) {
-      return {
-        action: positionKeys[keyCode],
-        isDown: isDown,
-      };
-    }
+    return keyCode => ({
+      action: positionKeys[keyCode],
+      isDown: isDown,
+    });
   }
 
   var keyStream = keyUps.filter(isPositionKey).map(keyMapper(false))
@@ -88,31 +86,50 @@ function initGame(canvas){
   // in the keyState stream for that time. This produces a new value for the
   // ship position
   var updater = new Rx.Subject();
-  var updateStream = updater.combineLatest(actionStream, shotKeys,
-    function(updateTime, lastAction, shotKeyState) {
-      var t = Math.max(lastAction.t, updateTime, shotKeyState.t);
-      return {
-        t: t,
-        k: lastAction.k,
-      };
-    });
-
   function updateSimulation() {
     updater.onNext(Date.now());
   }
 
+  var SHOTS = {
+    max : 8,
+    delay: 200,
+    life: 3000,
+    accel: {x: 0.2, y: 0},
+  };
+
+  var shotTimes = updater.combineLatest(shotKeys,
+    function(t, shotKeyState) {
+      if (!shotKeyState.s) return null;
+
+      var sT = shotKeyState.t;
+
+      // First shot
+      if (sT > t) return sT;
+
+      // Does a shot repetition fall within the interval?
+      var diff = t - shotKeyState.t;
+
+      var lastShotTime = t - diff % SHOTS.delay;
+
+      return lastShotTime;
+    }).filter(v => !!v).distinctUntilChanged();
+
+  var updateStream = updater.merge(shotTimes)
+    .combineLatest(actionStream, shotKeys,
+      function(updateTime, lastAction, shotKeyState) {
+        var t = Math.max(lastAction.t, updateTime, shotKeyState.t);
+        return {
+          t: t,
+          k: lastAction.k,
+        };
+      });
+
   // Elements of the inputPeriod stream are slices of time when
   // the input state was stable. This drives the simulation.
-  var inputPeriod = updateStream.bufferWithCount(2, 1).map(
-    function(keyStates) {
-      var oldState = keyStates[0];
-      var newState = keyStates[1];
-
-      return {
-        t: newState.t,
-        k: oldState.k,
-      };
-    });
+  var inputPeriod = updateStream.bufferWithCount(2, 1).map(keyStates => ({
+      t: keyStates[1].t,
+      k: keyStates[0].k,
+    }));
 
   var initialShip = {
     t: 0,
@@ -123,70 +140,17 @@ function initGame(canvas){
 
   var initialShots = [];
 
-  var ship = inputPeriod.scan(initialShip, shipF.applyInput);
+  var shipStream = inputPeriod.scan(initialShip, shipF.applyInput);
 
-  var SHOTS = {
-    max : 8,
-    delay: 200,
-    life: 3000,
-    accel: {x: 0.2, y: 0},
-  };
+  var shotStream = shotTimes.combineLatest(shipStream, function (shotT, ship) {
+    return (shotT == ship.t) ? ship : null;
+  }).filter(v => !!v);
+  
+  shotStream.subscribe(x => console.log(x));
 
-  var shotEmitter = ship.bufferWithCount(2,1).combineLatest(shotKeys,
-    function(shipStates, shotKeyState) {
-      if (!shotKeyState.s) return null;
-
-      var lastShip = shipStates[0];
-      var currShip = shipStates[1];
-
-      // Does a shot repetition fall within the interval?
-      // lastShip.t - now
-      var diff = currShip.t - shotKeyState.t;
-
-      // I think this was fixed by publish()ing the key streams
-      // but the behavior was unexpected here before I changed
-      // this to publish
-      if (diff < 0) throw "Unexpected time difference";
-
-      var shotTime = currShip.t - diff % SHOTS.delay;
-
-      // Bail if last shot doesn't fall in this window
-      if (shotTime <= lastShip.t) return null;
-
-      // This is an optimization, but here we assume that the render
-      // period is shorter than the shot period. That is, we never
-      // create two shots in a single render tick
-      
-      // This could be more awesome, but for now we just average the ship
-      // states over the interval to take the shot position and speed. A
-      // higher fidelity implementation woiuld be to examine the key states
-      // and use the function to calculate the ship state directly
-
-      var shot =  averageBodies(lastShip, currShip, shotTime);
-      shot.pos.x += Point.rotateX(shipF.nose, shot.rot);
-      shot.pos.y += Point.rotateY(shipF.nose, shot.rot);
-
-      shot.spd.x += Point.rotateX(SHOTS.accel, shot.rot);
-      shot.spd.y += Point.rotateY(SHOTS.accel, shot.rot);
-      return shot;
-    }).filter(function(shot) {
-      return !!shot;
-    });
-
-  // Interesting, the shotStream should conceptually just be the list of every
-  // shot, but we can trim it here and it seems like it will be much more
-  // efficient
-  var shotStream = shotEmitter.scan([], function(_shotList, nextShot) {
-    var t = nextShot.t;
-    var shotList = _.filter(_shotList, function(shot) {
-      return t - shot.t < SHOTS.life;
-    });
-    if (shotList.length < SHOTS.max) shotList.push(nextShot);
-    return shotList;
-  });
-
-  var EMPTY_LIST = [];
-  var shots = shotStream.combineLatest(updater, function(shotList, t) {
+  //FIXME
+  /*
+  var shotStream = shotTimes.scan([], function(shotList, t) {
     if (!shotList.length) return shotList;
     var firstShot = shotList[0];
 
@@ -201,16 +165,19 @@ function initGame(canvas){
       return t - shot.t < SHOTS.life;
     });
   });
+  */
 
 
   var renderInfo = {ship: null, shots:[]};
-  ship.subscribe(function(k) {
+  shipStream.subscribe(function(k) {
     renderInfo.ship = k;
   });
 
+  /*
   shots.subscribe(function(k) {
     renderInfo.shots = k;
   });
+  */
 
 
   function render(time) {
@@ -251,37 +218,6 @@ function drawShots(ctx, shotList) {
     ctx.closePath();
     ctx.fill();
   });
-}
-
-var posAndSpd = ['pos', 'spd'];
-function averageBodies(d0, d1, t) {
-  // NEXT: Average rotation for ship
-  var dt = t - d0.t;
-  if (dt < 0) throw "Point average underflow";
-  if (d0.t + dt > d1.t) throw "Point average overflow";
-
-  var timePeriod = d1.t - d0.t;
-  var dr = d1.rot - d0.rot;
-  var r = {
-    t: t,
-    rot: d0.rot + (dr/dt) * timePeriod,
-  };
-
-  posAndSpd.forEach(function(k) {
-    var dt = d1.t - d0.t;
-    var dx = d1[k].x - d0[k].x;
-    var dy = d1[k].y - d0[k].y;
-
-    var incX = dx/timePeriod;
-    var incY = dy/timePeriod;
-
-    r[k] = {
-      x: d0[k].x + incX*dt,
-      y: d0[k].y + incY*dt,
-    };
-  });
-  
-  return r;
 }
 
 global.initGame = initGame;
