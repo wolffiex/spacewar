@@ -143,7 +143,20 @@ function initGame(canvas){
   var shipStream = inputPeriod.scan(initialShip, shipF.applyInput);
 
   var shotStream = shotTimes.combineLatest(shipStream, function (shotT, ship) {
-    return (shotT == ship.t) ? ship : null;
+    if (shotT != ship.t) return null;
+    var r = ship.rot;
+    return {
+      t: shotT,
+      rot: r,
+      pos : {
+        x : ship.pos.x + Point.rotateX(shipF.nose, r),
+        y : ship.pos.y + Point.rotateY(shipF.nose, r),
+      },
+      spd : {
+        x : ship.spd.x += Point.rotateX(SHOTS.accel, r),
+        y : ship.spd.y += Point.rotateY(SHOTS.accel, r),
+      },
+    }
   }).filter(v => !!v);
   
   shotStream.subscribe(x => console.log(x));
