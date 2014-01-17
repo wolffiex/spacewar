@@ -107,7 +107,6 @@ function applyInput(oldShip, input) {
   if (pos.y < 0) pos.y += Point.screenSize.y;
   if (pos.y > Point.screenSize.y) pos.y -= Point.screenSize.y;
 
-
   return {
     pos: pos,
     rot: rot,

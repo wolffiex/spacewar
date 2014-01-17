@@ -7,11 +7,9 @@ require('./rx/rx.time');
 
 var _ = require('./underscore');
 
-var shipF = require('./ship');
+var Ship = require('./ship');
 var Point = require('./Point');
 var Keys = require('./Keys');
-
-var tick = () => Rx.Observable.timer(0);
 
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
@@ -49,7 +47,6 @@ function initGame(canvas){
       return lastShotTime;
     }).filter(v => !!v).distinctUntilChanged();
 
-
   var updateStream = shotTimes.merge(updater)
     .combineLatest(motionKeys, (updateTime, lastAction) => ({
       t: Math.max(lastAction.t, updateTime),
@@ -72,9 +69,9 @@ function initGame(canvas){
 
   var initialShots = [];
 
-  var shipStream = inputPeriod.scan(initialShip, shipF.applyInput);
+  var shipStream = inputPeriod.scan(initialShip, Ship.applyInput);
 
-  var shotStream = shotTimes.join(shipStream, tick, tick, function (shotT, ship) {
+  var shotStream = shotTimes.combineLatest(shipStream, function (shotT, ship) {
       if (shotT != ship.t) return null;
 
       var r = ship.rot;
@@ -82,8 +79,8 @@ function initGame(canvas){
         t: shotT,
         rot: r,
         pos : {
-          x : ship.pos.x + Point.rotateX(shipF.nose, r),
-          y : ship.pos.y + Point.rotateY(shipF.nose, r),
+          x : ship.pos.x + Point.rotateX(Ship.nose, r),
+          y : ship.pos.y + Point.rotateY(Ship.nose, r),
         },
         spd : {
           x : ship.spd.x + Point.rotateX(SHOTS.accel, r),
@@ -137,11 +134,11 @@ function initGame(canvas){
     ctx.clearRect(0, 0, Point.screenSize.x, Point.screenSize.y);
 
     if (ship) {
-      shipF.draw(ctx, ship.pos, ship.rot);
+      Ship.draw(ctx, ship.pos, ship.rot);
       var otherSide = Point.foldOnScreen(ship.pos);
 
       if (otherSide) {
-        shipF.draw(ctx, otherSide, ship.rot);
+        Ship.draw(ctx, otherSide, ship.rot);
       }
     }
 

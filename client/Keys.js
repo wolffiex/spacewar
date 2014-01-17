@@ -47,9 +47,7 @@ module.exports.getStreams = (doc) => {
       var nextKeys = _.clone(old.k);
       nextKeys[input.action] = input.isDown;
       return {t: Date.now(), k: nextKeys};
-    }).publish();
-
-  _actionStream.connect();
+    }).share();
 
   var motionKeys = Rx.Observable.returnValue(initialKeys)
     .concat(_actionStream);
@@ -67,9 +65,8 @@ module.exports.getStreams = (doc) => {
   var _shotKeys = keyUps.filter(isShotKey).map(shotKeyMapper(false))
     .merge(keyDowns.filter(isShotKey).map(shotKeyMapper(true)))
     .distinctUntilChanged(val => val.s)
-    .publish();
+    .share();
 
-  _shotKeys.connect();
   shotKeys = Rx.Observable.returnValue({t:0, s:false}).concat(_shotKeys);
 
   return {motionKeys, shotKeys};
