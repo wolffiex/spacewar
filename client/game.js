@@ -7,64 +7,8 @@ require('./rx/rx.time');
 
 var _ = require('./underscore');
 
-var screenSize = {
-  x: 800,
-  y: 400, 
-}
-
-var shipPoly = [
-  {x:   15, y: 0},
-  {x:  -15, y:  10},
-  {x:   -4, y:   0},
-  {x:  -15, y:  -10},
-];
-
-var shipNose = shipPoly[0];
-
-function rotatePoint(pt, r) {
-  return { 
-    x: pt.x * Math.cos(r) - pt.y * Math.sin(r),
-    y: pt.x * Math.sin(r) + pt.y * Math.cos(r),
-  };
-}
-
-function rotatePointX(pt, r) {
-  return pt.x * Math.cos(r) - pt.y * Math.sin(r);
-}
-
-function rotatePointY(pt, r) {
-  return pt.x * Math.sin(r) + pt.y * Math.cos(r);
-}
-
-function translatePt(pt, dxdy) {
-  return {
-    x: pt.x + dxdy.x,
-    y: pt.y + dxdy.y,
-  };
-}
-
-function drawShip(ctx, pos, r) {
-  var ship = shipPoly.map(function(pt) {
-    var newPt = rotatePoint(pt, r);
-    // don't make an extra array by calling translatePt
-    newPt.x += pos.x
-    newPt.y += pos.y
-
-    return newPt;
-  });
-
-  ctx.fillStyle = '#F00';
-  ctx.beginPath();
-
-  var start = _.last(ship); 
-  ctx.moveTo(start.x, start.y);
-
-  _.forEach(ship, function(pt) {
-    ctx.lineTo(pt.x, pt.y);
-  });
-
-  ctx.fill();
-}
+var shipF = require('./ship');
+var Point = require('./Point');
 
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
@@ -187,7 +131,7 @@ function initGame(canvas){
 
   var initialShots = [];
 
-  var ship = inputPeriod.scan(initialShip, applyInputToShip);
+  var ship = inputPeriod.scan(initialShip, shipF.applyInput);
 
   var SHOTS = {
     max : 8,
@@ -227,11 +171,11 @@ function initGame(canvas){
       // and use the function to calculate the ship state directly
 
       var shot =  averageBodies(lastShip, currShip, shotTime);
-      shot.pos.x += rotatePointX(shipNose, shot.rot);
-      shot.pos.y += rotatePointY(shipNose, shot.rot);
+      shot.pos.x += Point.rotateX(shipF.nose, shot.rot);
+      shot.pos.y += Point.rotateY(shipF.nose, shot.rot);
 
-      shot.spd.x += rotatePointX(SHOTS.accel, shot.rot);
-      shot.spd.y += rotatePointY(SHOTS.accel, shot.rot);
+      shot.spd.x += Point.rotateX(SHOTS.accel, shot.rot);
+      shot.spd.y += Point.rotateY(SHOTS.accel, shot.rot);
       return shot;
     }).filter(function(shot) {
       return !!shot;
@@ -281,14 +225,14 @@ function initGame(canvas){
     var ship = renderInfo.ship;
     var shots = renderInfo.shots;
 
-    ctx.clearRect(0, 0, screenSize.x, screenSize.y);
+    ctx.clearRect(0, 0, Point.screenSize.x, Point.screenSize.y);
 
     if (ship) {
-      drawShip(ctx, ship.pos, ship.rot);
-      var otherSide = foldPointOnScreen(ship.pos);
+      shipF.draw(ctx, ship.pos, ship.rot);
+      var otherSide = Point.foldOnScreen(ship.pos);
 
       if (otherSide) {
-        drawShip(ctx, otherSide, ship.rot);
+        shipF.draw(ctx, otherSide, ship.rot);
       }
     }
 
@@ -306,119 +250,15 @@ function drawShots(ctx, shotList) {
     var dt = Date.now() - shot.t;
     var x = shot.pos.x + shot.spd.x * dt;;
     var y = shot.pos.y + shot.spd.y * dt;;
-    x = x % screenSize.x;
-    y = y % screenSize.y;
-    if (x < 0) x += screenSize.x;
-    if (y < 0) y += screenSize.y;
+    x = x % Point.screenSize.x;
+    y = y % Point.screenSize.y;
+    if (x < 0) x += Point.screenSize.x;
+    if (y < 0) y += Point.screenSize.y;
     ctx.beginPath();
     ctx.arc(x, y, 2, 0, Math.PI*2, true); 
     ctx.closePath();
     ctx.fill();
   });
-}
-
-var rotSpeed = 0.003;
-var thrustAccel = {x: 0.0002, y: 0};
-var maxSpd = {x:0.4, y:0};
-var maxSpdHyp = maxSpd.x * maxSpd.x;
-function applyInputToShip (oldShip, input) {
-  var dt = input.t - oldShip.t;
-  var rot = oldShip.rot;
-  var pos = oldShip.pos;
-  var spd = oldShip.spd;
-
-  if (input.k.thrust) {
-    // It might be better to express this as continuous function rather than a
-    // discrete simulation, but I suck at math
-    var spdX = spd.x;
-    var spdY = spd.y;
-
-    var posX = pos.x;
-    var posY = pos.y;
-
-
-    // For every millisecond, we're just going to simulate
-    // what happened
-    for (var i = 0; i  < dt; i++) {
-      if (input.k.left)  rot -= rotSpeed;
-      if (input.k.right) rot += rotSpeed;
-
-      posX += spdX;
-      posY += spdY;
-
-      spdX += rotatePointX(thrustAccel, rot);
-      spdY += rotatePointY(thrustAccel, rot);
-
-      // Limit speed by scaling the speed vector if
-      // necessary
-      if (spdX*spdX + spdY*spdY > maxSpdHyp) {
-        var theta = Math.atan(spdY/spdX);
-
-        var newSpdX = rotatePointX(maxSpd, theta);
-        var newSpdY = rotatePointY(maxSpd, theta);
-
-        if (spdX * newSpdX < 0 ) {
-          newSpdX *= -1;
-        }
-
-        if (spdY * newSpdY < 0 ) {
-          newSpdY *= -1;
-        }
-
-        spdX = newSpdX;
-        spdY = newSpdY;
-      }
-    }
-
-    spd = {x: spdX, y: spdY};
-    pos = {x: posX, y: posY};
-  } else {
-    // When the thrusters are off, the continuous
-    // function is easy
-    if (input.k.left)  rot -= dt*rotSpeed;
-    if (input.k.right) rot += dt*rotSpeed;
-    
-    pos = {
-      x: oldShip.pos.x + dt * oldShip.spd.x,
-      y: oldShip.pos.y + dt * oldShip.spd.y,
-    };
-
-  }
-
-  // Screen wrapping
-  if (pos.x < 0) pos.x += screenSize.x;
-  if (pos.x > screenSize.x) pos.x -= screenSize.x;
-  if (pos.y < 0) pos.y += screenSize.y;
-  if (pos.y > screenSize.y) pos.y -= screenSize.y;
-
-
-  return {
-    pos: pos,
-    rot: rot,
-    spd: spd,
-    t: input.t,
-  }
-}
-
-var tolerance = 20;
-function foldPointOnScreen(pt) {
-  var foldedPt = null;
-
-  if (pt.x < tolerance) {
-    foldedPt = {x: pt.x + screenSize.x, y: pt.y};
-  } else if (pt.x > screenSize.x - tolerance) {
-    foldedPt = {x: pt.x - screenSize.x, y: pt.y};
-  }
-
-  if (pt.y < tolerance) {
-    foldedPt = foldedPt || _.clone(pt);
-    foldedPt.y = pt.y + screenSize.y
-  } else if (pt.y > screenSize.y - tolerance) {
-    foldedPt = foldedPt || _.clone(pt);
-    foldedPt.y = pt.y - screenSize.y
-  }
-
-  return foldedPt;
 }
 
 var posAndSpd = ['pos', 'spd'];
