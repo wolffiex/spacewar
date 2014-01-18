@@ -49,8 +49,8 @@ function initGame(canvas){
   } 
 
   var keyBuffer = keyInput.merge(updater).scan({
-    last: {t:null, k:null},
-    next: {t:null, k:null},
+    last: {t:null, k:{}},
+    next: {t:null, k:{}},
   }, function(input, next) {
     // This is tricky, but it's optimized for render loop,
     // to avoid object creation
@@ -79,13 +79,19 @@ function initGame(canvas){
     var shipB = state.ships.b;
 
     var keys = inputs.last.k;
+    var startFire = !keys.fire && inputs.next.k.fire;
 
     for (var t = inputs.last.t; t < inputs.next.t; t++) {
       if (keys) {
         shipA = Ship.inputTick(shipA, keys);
-        if (keys.fire) shipA.shots = Shots.doFire(shipA, t);
+        shipA.shots = Shots.cull(shipA.shots, t);
+        if (keys.fire) {
+          shipA.shots = Shots.repeatFire(shipA, t);
+        }
       }
     }
+
+    if (startFire) shipA.shots = Shots.startFire(shipA, t);
 
     // not necessary since these functions are mutative, but
     // it would be nice if they didn't have to be

@@ -4,24 +4,22 @@ var _ = require('./underscore');
 
 var SHOTS = {
   max : 8,
-  delay: 200,
+  delay: 400,
   life: 3000,
   accel: {x: 0.2, y: 0},
 };
 
 // Mutates shots
-exports.doFire = function(ship, t) {
-      /*
-      var sT = key.t;
+exports.cull = function(shots, t) {
+  return _.filter(shots, function(shot) {
+    return t - shot.t < SHOTS.life;
+  });
+}
 
-      var diff = t - key.t;
-
-      var lastShotTime = t - diff % SHOTS.delay;
-      */
-
+// Mutates ship.shots
+function tryFire(ship, t) {
   var shots = ship.shots;
-  var lastT = shots.length ? _.last(shots).t : 0;
-  if (t - lastT > SHOTS.delay && shots.length < SHOTS.max) {
+  if (shots.length < SHOTS.max) {
     var r = ship.rot;
     shots.push({
       t: t,
@@ -36,6 +34,19 @@ exports.doFire = function(ship, t) {
     });
   }
 
+  return shots;
+}
+
+// Mutates ship.shots
+exports.startFire = function(ship, t) {
+  return tryFire(ship, t);
+}
+
+// Mutates ship.shots
+exports.repeatFire = function(ship, t) {
+  var shots = ship.shots;
+  var lastT = shots.length ? _.last(shots).t : 0;
+  if (t - lastT > SHOTS.delay ) shots = tryFire(ship, t);
   return shots;
 }
 
