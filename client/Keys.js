@@ -1,12 +1,13 @@
 var _ = require('./underscore');
 var Rx = require('./rx/rx');
 
-module.exports.getStreams = (doc) => {
+module.exports.getStream = (doc) => {
 
   var positionKeys = {
     37: 'left',
     38: 'thrust',
     39: 'right',
+    32: 'fire',
   }
 
   // Get keyCode of first event
@@ -43,31 +44,11 @@ module.exports.getStreams = (doc) => {
     },
   };
 
-  var _actionStream = keyStream.scan(initialKeys, function(old, input) {
+  return Rx.Observable.returnValue(initialKeys).concat(
+    keyStream.scan(initialKeys, function(old, input) {
       var nextKeys = _.clone(old.k);
       nextKeys[input.action] = input.isDown;
       return {t: Date.now(), k: nextKeys};
-    }).share();
+    }).share());
 
-  var motionKeys = Rx.Observable.returnValue(initialKeys)
-    .concat(_actionStream);
-
-  function isShotKey(keyCode) {
-    return keyCode == 32;
-  }
-
-  function shotKeyMapper(isDown) {
-    return function() {
-      return {t: Date.now(), s: isDown, u: Math.random()};
-    }
-  }
-
-  var _shotKeys = keyUps.filter(isShotKey).map(shotKeyMapper(false))
-    .merge(keyDowns.filter(isShotKey).map(shotKeyMapper(true)))
-    .distinctUntilChanged(val => val.s)
-    .share();
-
-  shotKeys = Rx.Observable.returnValue({t:0, s:false}).concat(_shotKeys);
-
-  return {motionKeys, shotKeys};
 }

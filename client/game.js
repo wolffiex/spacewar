@@ -14,7 +14,7 @@ var Keys = require('./Keys');
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
 
-  var {motionKeys, shotKeys} = Keys.getStreams(document);
+  var keyInput = Keys.getStream(document);
 
   // When we push a time value onto the updateStream, it makes a new entry
   // in the keyState stream for that time. This produces a new value for the
@@ -31,12 +31,9 @@ function initGame(canvas){
     accel: {x: 0.2, y: 0},
   };
 
-  var updateWithFirstShots = updater.merge(
-    shotKeys.map(key => key.s ? key.t : null).filter(v=>!!v));
-
-  var shotTimes = updater.combineLatest(shotKeys,
+  var shotTimes = updater.combineLatest(keyInput,
     function(t, key) {
-      if (!key.s) return null;
+      if (!key.k.fire) return null;
 
       var sT = key.t;
 
@@ -47,8 +44,11 @@ function initGame(canvas){
       return lastShotTime;
     }).filter(v => !!v).distinctUntilChanged();
 
+  //shotTimes.subscribe(x=>console.log(x));
+
+
   var updateStream = shotTimes.merge(updater)
-    .combineLatest(motionKeys, (updateTime, lastAction) => ({
+    .combineLatest(keyInput, (updateTime, lastAction) => ({
       t: Math.max(lastAction.t, updateTime),
       k: lastAction.k,
     }));
@@ -88,6 +88,8 @@ function initGame(canvas){
         },
       };
     }).filter(v => !!v)
+    // Why are we getting dups here?
+    .distinctUntilChanged(shot=>shot.t)
     .scan([], function(shotList, nextShot) {
       if (!nextShot) return shotList;
       // Interesting, the shotStream should conceptually just be the list of every
