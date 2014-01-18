@@ -17,9 +17,9 @@ function initGame(canvas){
 
   var keyInput = Keys.getStream(document);
 
-  // When we push a time value onto the updateStream, it makes a new entry
-  // in the keyState stream for that time. This produces a new value for the
-  // ship position
+  // When we push a time value onto the updater, it makes a new entry in the
+  // keyBuffer for that time. This produces a new value for the ship
+  // position
   var updater = new Rx.Subject();
   var carrier = {t:null};
   function updateSimulation() {
@@ -108,11 +108,15 @@ function initGame(canvas){
   loop.subscribe(state => {renderInfo.ships = state.ships});
 
   function render(time) {
-    ctx.clearRect(0, 0, Point.screenSize.x, Point.screenSize.y);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, Point.screenSize.x, Point.screenSize.y);
 
-    renderShip(renderInfo.ships.a);
+    ctx.fillStyle = '#0FF';
+    Ship.draw(ctx, renderInfo.ships.a);
+    ctx.fillStyle = '#F0F';
+    Ship.draw(ctx, renderInfo.ships.b);
 
-    renderShip(renderInfo.ships.b);
+    ctx.fillStyle = '#0FF';
     var shotsA = renderInfo.ships.a.shots;
     if (shotsA.length) Shots.draw(ctx, shotsA);
 
@@ -120,125 +124,7 @@ function initGame(canvas){
     _.defer(updateSimulation);
   };
 
-  function renderShip(ship) {
-    var shots = ship.shots;
-
-    if (ship) {
-      Ship.draw(ctx, ship.pos, ship.rot);
-      var otherSide = Point.foldOnScreen(ship.pos);
-
-      if (otherSide) {
-        Ship.draw(ctx, otherSide, ship.rot);
-      }
-    }
-
-  }
-
   requestAnimationFrame(render);
-
-  /*
-
-
-  var shotTimes = updater.combineLatest(keyInput,
-    function(t, key) {
-      if (!key.k.fire) return null;
-
-      var sT = key.t;
-
-      var diff = t - key.t;
-
-      var lastShotTime = t - diff % SHOTS.delay;
-
-      return lastShotTime;
-    }).filter(v => !!v).distinctUntilChanged();
-
-  //shotTimes.subscribe(x=>console.log(x));
-
-
-  var updateStream = shotTimes.merge(updater)
-    .combineLatest(keyInput, (updateTime, lastAction) => ({
-      t: Math.max(lastAction.t, updateTime),
-      k: lastAction.k,
-    }));
-
-  // Elements of the inputPeriod stream are slices of time when
-  // the input state was stable. This drives the simulation.
-  var inputPeriod = updateStream.bufferWithCount(2, 1).map(keyStates => ({
-      t: keyStates[1].t,
-      k: keyStates[0].k,
-    }));
-
-  var initialShip = {
-    t: 0,
-    pos: {x: 100, y: 100},
-    spd: {x: 0, y: 0},
-    rot: Math.PI,
-  };
-
-  var initialShots = [];
-
-  var shipStream = inputPeriod.scan(initialShip, Ship.applyInput);
-
-  var shotStream = shotTimes.combineLatest(shipStream, function (shotT, ship) {
-      if (shotT != ship.t) return null;
-
-      var r = ship.rot;
-      return {
-        t: shotT,
-        rot: r,
-        pos : {
-          x : ship.pos.x + Point.rotateX(Ship.nose, r),
-          y : ship.pos.y + Point.rotateY(Ship.nose, r),
-        },
-        spd : {
-          x : ship.spd.x + Point.rotateX(SHOTS.accel, r),
-          y : ship.spd.y + Point.rotateY(SHOTS.accel, r),
-        },
-      };
-    }).filter(v => !!v)
-    // Why are we getting dups here?
-    .distinctUntilChanged(shot=>shot.t)
-    .scan([], function(shotList, nextShot) {
-      if (!nextShot) return shotList;
-      // Interesting, the shotStream should conceptually just be the list of every
-      // shot, but we can trim it here and it seems like it will be much more
-      // efficient
-      var t = nextShot.t;
-      var shotList = _.filter(shotList, function(shot) {
-        return t - shot.t < SHOTS.life;
-      });
-      if (shotList.length < SHOTS.max) shotList.push(nextShot);
-      return shotList;
-    });
-
-  var activeShots = shotStream.combineLatest(updater, function(shotList, t) {
-    if (!shotList.length) return shotList;
-    var firstShot = shotList[0];
-
-    // Optimization for last shot is old
-    var lastShot = _.last(shotList);
-    if (t - lastShot.t > SHOTS.life) return [];
-
-    // or first shot is young
-    if (t - firstShot.t < SHOTS.life) return shotList;
-
-    return _.filter(shotList, function(shot) {
-      return t - shot.t < SHOTS.life;
-    });
-  });
-
-  var renderInfo = {ship: null, shots:[]};
-  shipStream.subscribe(function(k) {
-    renderInfo.ship = k;
-  });
-
-  activeShots.subscribe(function(k) {
-    renderInfo.shots = k;
-  });
-
-
-  */
-
 }
 
 global.initGame = initGame;

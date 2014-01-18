@@ -9,8 +9,17 @@ var shipPoly = [
 ];
 
 
-function draw(ctx, pos, r) {
-  var ship = shipPoly.map(function(pt) {
+function draw(ctx, ship) {
+  _draw(ctx, ship.pos, ship.rot);
+  var otherSide = Point.foldOnScreen(ship.pos);
+
+  if (otherSide) {
+    _draw(ctx, otherSide, ship.rot);
+  }
+}
+
+function _draw(ctx, pos, r) {
+  var pts = shipPoly.map(function(pt) {
     var newPt = Point.rotate(pt, r);
     // don't make an extra array by calling translatePt
     newPt.x += pos.x
@@ -19,13 +28,12 @@ function draw(ctx, pos, r) {
     return newPt;
   });
 
-  ctx.fillStyle = '#F00';
   ctx.beginPath();
 
-  var start = _.last(ship); 
+  var start = _.last(pts); 
   ctx.moveTo(start.x, start.y);
 
-  _.forEach(ship, function(pt) {
+  _.forEach(pts, function(pt) {
     ctx.lineTo(pt.x, pt.y);
   });
 
