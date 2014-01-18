@@ -7,9 +7,10 @@ require('./rx/rx.time');
 
 var _ = require('./underscore');
 
-var Ship = require('./ship');
+var Ship = require('./Ship');
 var Point = require('./Point');
 var Keys = require('./Keys');
+var Shots = require('./Shots');
 
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
@@ -74,18 +75,16 @@ function initGame(canvas){
   });
 
   var loop = keyBuffer.scan(initialState, function(state, inputs) {
-    //console.log(inputs)
-
-    var dt = inputs.next.t - inputs.last.t;
-    if (dt < 0) throw "Reverse time for input";
-
     var shipA = state.ships.a;
     var shipB = state.ships.b;
 
     var keys = inputs.last.k;
 
-    for (var i = 0; i  < dt; i++) {
-      if (keys) shipA = Ship.inputTick(shipA, keys);
+    for (var t = inputs.last.t; t < inputs.next.t; t++) {
+      if (keys) {
+        shipA = Ship.inputTick(shipA, keys);
+        if (keys.fire) shipA.shots = Shots.doFire(shipA, t);
+      }
     }
 
     // not necessary since these functions are mutative, but
@@ -106,7 +105,10 @@ function initGame(canvas){
     ctx.clearRect(0, 0, Point.screenSize.x, Point.screenSize.y);
 
     renderShip(renderInfo.ships.a);
+
     renderShip(renderInfo.ships.b);
+    var shotsA = renderInfo.ships.a.shots;
+    if (shotsA.length) Shots.draw(ctx, shotsA);
 
     requestAnimationFrame(render);
     _.defer(updateSimulation);
@@ -124,17 +126,10 @@ function initGame(canvas){
       }
     }
 
-    if (shots.length) drawShots(ctx, renderInfo.shots);
   }
 
   requestAnimationFrame(render);
 
-  var SHOTS = {
-    max : 8,
-    delay: 200,
-    life: 3000,
-    accel: {x: 0.2, y: 0},
-  };
   /*
 
 
@@ -238,24 +233,6 @@ function initGame(canvas){
 
   */
 
-}
-
-var ods = null;
-function drawShots(ctx, shotList) {
-  ods = shotList;
-  shotList.forEach(function(shot) {
-    var dt = Date.now() - shot.t;
-    var x = shot.pos.x + shot.spd.x * dt;;
-    var y = shot.pos.y + shot.spd.y * dt;;
-    x = x % Point.screenSize.x;
-    y = y % Point.screenSize.y;
-    if (x < 0) x += Point.screenSize.x;
-    if (y < 0) y += Point.screenSize.y;
-    ctx.beginPath();
-    ctx.arc(x, y, 2, 0, Math.PI*2, true); 
-    ctx.closePath();
-    ctx.fill();
-  });
 }
 
 global.initGame = initGame;
