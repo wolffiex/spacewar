@@ -20,8 +20,10 @@ function initGame(canvas){
   // in the keyState stream for that time. This produces a new value for the
   // ship position
   var updater = new Rx.Subject();
+  var carrier = {t:null};
   function updateSimulation() {
-    updater.onNext(Date.now());
+    carrier.t = Date.now();
+    updater.onNext(carrier);
   }
 
 
@@ -45,35 +47,53 @@ function initGame(canvas){
     ships: initialShips,
   } 
 
-  var loop = keyInput.scan({
-      last: null,
-      next: {t:null, k:null}
-    }, function(keys, next) {
-      // Optimized for render loop, to avoid object creation
-      keys.last = keys.next;
-      keys.next = next;
+  var keyBuffer = keyInput.merge(updater).scan({
+    last: {t:null, k:null},
+    next: {t:null, k:null},
+  }, function(input, next) {
+    // This is tricky, but it's optimized for render loop,
+    // to avoid object creation
+    input.last.t = input.next.t;
+    input.last.k = input.next.k;
 
-      // FIXME
-      if (!keys.last.t) {
-        keys.last.t = keys.next.t;
-      }
-      return keys;
-    }).scan(initialState, function(state, inputs) {
-      //console.log(inputs)
+    if (next.k) {
+      // This is actual input
+      input.next = next;
+    } else {
+      // This is input we're fabricating to drive the render loop
+      input.next.t = next.t;
+      input.next.k = input.last.k;
+    }
 
-      var dt = inputs.next.t - inputs.last.t;
-      if (dt < 0) throw "Reverse time for input";
+    // FIXME
+    if (!input.last.t) {
+      input.last.t = input.next.t;
+    }
 
-      var shipA = state.ships.a;
-      var shipB = state.ships.b;
+    return input;
+  });
 
-      var keys = inputs.last.k;
-      console.log(dt, keys)
-      for (var i = 0; i  < dt; i++) {
-        if (keys) shipA = Ship.inputTick(shipA, keys);
-      }
-      return state;
-    });
+  var loop = keyBuffer.scan(initialState, function(state, inputs) {
+    //console.log(inputs)
+
+    var dt = inputs.next.t - inputs.last.t;
+    if (dt < 0) throw "Reverse time for input";
+
+    var shipA = state.ships.a;
+    var shipB = state.ships.b;
+
+    var keys = inputs.last.k;
+
+    for (var i = 0; i  < dt; i++) {
+      if (keys) shipA = Ship.inputTick(shipA, keys);
+    }
+
+    // not necessary since these functions are mutative, but
+    // it would be nice if they didn't have to be
+    state.ships.a = shipA;
+    state.ships.b = shipB;
+    return state;
+  });
 
   var renderInfo = {
     ships : initialShips

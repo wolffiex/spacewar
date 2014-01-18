@@ -124,8 +124,9 @@ exports.inputTick = function(ship, keys) {
   if (keys.left)  ship.rot -= rotSpeed;
   if (keys.right) ship.rot += rotSpeed;
 
-  ship.pos.x += ship.spd.x;
-  ship.pos.y += ship.spd.y;
+  var pos = ship.pos;
+  pos.x += ship.spd.x;
+  pos.y += ship.spd.y;
 
   if (keys.thrust) {
     var spdX = ship.spd.x;
@@ -156,5 +157,10 @@ exports.inputTick = function(ship, keys) {
     ship.spd.x = spdX;
     ship.spd.y = spdY;
   }
+
+  if (pos.x < 0) pos.x += Point.screenSize.x;
+  if (pos.x > Point.screenSize.x) pos.x -= Point.screenSize.x;
+  if (pos.y < 0) pos.y += Point.screenSize.y;
+  if (pos.y > Point.screenSize.y) pos.y -= Point.screenSize.y;
   return ship;
 }
