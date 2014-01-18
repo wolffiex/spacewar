@@ -24,12 +24,99 @@ function initGame(canvas){
     updater.onNext(Date.now());
   }
 
+
+  var initialShips = {
+    a: {
+      pos: {x:100, y:100},
+      spd: {x:0, y:0},
+      rot: Math.PI,
+      shots: [],
+    },
+
+    b: {
+      pos: {x:300, y:300},
+      spd: {x:0, y:0},
+      rot: 0,
+      shots: [],
+    },
+  };
+
+  var initialState = {
+    ships: initialShips,
+  } 
+
+  var loop = keyInput.scan({
+      last: null,
+      next: {t:null, k:null}
+    }, function(keys, next) {
+      // Optimized for render loop, to avoid object creation
+      keys.last = keys.next;
+      keys.next = next;
+
+      // FIXME
+      if (!keys.last.t) {
+        keys.last.t = keys.next.t;
+      }
+      return keys;
+    }).scan(initialState, function(state, inputs) {
+      //console.log(inputs)
+
+      var dt = inputs.next.t - inputs.last.t;
+      if (dt < 0) throw "Reverse time for input";
+
+      var shipA = state.ships.a;
+      var shipB = state.ships.b;
+
+      var keys = inputs.last.k;
+      console.log(dt, keys)
+      for (var i = 0; i  < dt; i++) {
+        if (keys) shipA = Ship.inputTick(shipA, keys);
+      }
+      return state;
+    });
+
+  var renderInfo = {
+    ships : initialShips
+  };
+
+  // This is optimized not to create an object
+  loop.subscribe(state => {renderInfo.ships = state.ships});
+
+  function render(time) {
+    ctx.clearRect(0, 0, Point.screenSize.x, Point.screenSize.y);
+
+    renderShip(renderInfo.ships.a);
+    renderShip(renderInfo.ships.b);
+
+    requestAnimationFrame(render);
+    _.defer(updateSimulation);
+  };
+
+  function renderShip(ship) {
+    var shots = ship.shots;
+
+    if (ship) {
+      Ship.draw(ctx, ship.pos, ship.rot);
+      var otherSide = Point.foldOnScreen(ship.pos);
+
+      if (otherSide) {
+        Ship.draw(ctx, otherSide, ship.rot);
+      }
+    }
+
+    if (shots.length) drawShots(ctx, renderInfo.shots);
+  }
+
+  requestAnimationFrame(render);
+
   var SHOTS = {
     max : 8,
     delay: 200,
     life: 3000,
     accel: {x: 0.2, y: 0},
   };
+  /*
+
 
   var shotTimes = updater.combineLatest(keyInput,
     function(t, key) {
@@ -129,28 +216,8 @@ function initGame(canvas){
   });
 
 
-  function render(time) {
-    var ship = renderInfo.ship;
-    var shots = renderInfo.shots;
+  */
 
-    ctx.clearRect(0, 0, Point.screenSize.x, Point.screenSize.y);
-
-    if (ship) {
-      Ship.draw(ctx, ship.pos, ship.rot);
-      var otherSide = Point.foldOnScreen(ship.pos);
-
-      if (otherSide) {
-        Ship.draw(ctx, otherSide, ship.rot);
-      }
-    }
-
-    if (shots.length) drawShots(ctx, renderInfo.shots);
-
-    requestAnimationFrame(render);
-    _.defer(updateSimulation);
-  };
-
-  requestAnimationFrame(render);
 }
 
 var ods = null;

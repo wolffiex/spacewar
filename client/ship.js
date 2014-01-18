@@ -118,3 +118,43 @@ function applyInput(oldShip, input) {
 exports.nose = shipPoly[0];
 exports.draw = draw;
 exports.applyInput = applyInput;
+
+// This mutatates the shp data!
+exports.inputTick = function(ship, keys) {
+  if (keys.left)  ship.rot -= rotSpeed;
+  if (keys.right) ship.rot += rotSpeed;
+
+  ship.pos.x += ship.spd.x;
+  ship.pos.y += ship.spd.y;
+
+  if (keys.thrust) {
+    var spdX = ship.spd.x;
+    var spdY = ship.spd.y;
+    spdX += Point.rotateX(thrustAccel, ship.rot);
+    spdY += Point.rotateY(thrustAccel, ship.rot);
+
+    // Limit speed by scaling the speed vector if
+    // necessary
+    if (spdX*spdX + spdY*spdY > maxSpdHyp) {
+      var theta = Math.atan(spdY/spdX);
+
+      var newSpdX = Point.rotateX(maxSpd, theta);
+      var newSpdY = Point.rotateY(maxSpd, theta);
+
+      if (spdX * newSpdX < 0 ) {
+        newSpdX *= -1;
+      }
+
+      if (spdY * newSpdY < 0 ) {
+        newSpdY *= -1;
+      }
+
+      spdX = newSpdX;
+      spdY = newSpdY;
+    }
+
+    ship.spd.x = spdX;
+    ship.spd.y = spdY;
+  }
+  return ship;
+}

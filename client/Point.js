@@ -51,3 +51,4 @@ exports.foldOnScreen = function(pt) {
   return foldedPt;
 }
 
+exports.data = (x,y) => {x,y};
