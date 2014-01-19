@@ -45,6 +45,7 @@ function initGame(canvas){
   };
 
   var initialState = {
+    collisions: [],
     ships: initialShips,
   } 
 
@@ -82,20 +83,36 @@ function initGame(canvas){
     var startFire = !keys.fire && inputs.next.k.fire;
 
     var startT = inputs.last.t
-    var tCheckShipBShotsA = startT
 
     for (var t = startT; t < inputs.next.t; t++) {
       if (keys) {
         shipA = Ship.inputTick(shipA, keys);
-        shipA.shots = Shots.tick(shipA.shots);
+        shipA.shots = Shots.tickShots(shipA.shots);
 
         if (keys.fire) {
           shipA.shots = Shots.repeatFire(shipA);
         }
       }
 
-      if (tCheckShipBShotsA == t) {
-        //var {collisions, nextCheck} = Ship.checkShots(shipB, shipA.shots);
+      state.collisions = Shots.tickCollisions(state.collisions);
+
+      var newCollisions = Ship.checkShots(shipB, shipA.shots);
+
+      if (newCollisions.length) {
+        // this mutates shipA.shots
+        var shots = shipA.shots;
+
+        _.each(newCollisions, function(shotIndex) {
+          //
+          var collision = shots[shotIndex];
+          shots[shotIndex] = null;
+          collision.age = 0;
+          collision.spd.x /= 2;
+          collision.spd.y /= 2;
+
+          state.collisions = state.collisions.concat(collision);
+        });
+        shipA.shots = _.compact(shots);
       }
     }
 
@@ -110,11 +127,15 @@ function initGame(canvas){
   });
 
   var renderInfo = {
-    ships : initialShips
+    ships : initialShips,
+    collisions : [],
   };
 
   // This is optimized not to create an object
-  loop.subscribe(state => {renderInfo.ships = state.ships});
+  loop.subscribe(state => {
+    renderInfo.ships = state.ships;
+    renderInfo.collisions = state.collisions;
+  });
 
   function render(time) {
     ctx.fillStyle = '#000';
@@ -128,6 +149,10 @@ function initGame(canvas){
     ctx.fillStyle = '#0FF';
     var shotsA = renderInfo.ships.a.shots;
     if (shotsA.length) Shots.draw(ctx, shotsA);
+
+    if (renderInfo.collisions.length) {
+      Shots.drawCollisions(ctx, renderInfo.collisions);
+    }
 
     requestAnimationFrame(render);
     _.defer(updateSimulation);

@@ -93,4 +93,25 @@ exports.inputTick = function(ship, keys) {
 
 exports.nose = shipPoly[0];
 exports.draw = draw;
-exports.boundingRadius = 15;
+
+var boundingRadius = 15;
+var EMPTY_LIST = [];
+var checkResult = {collisions: null, shots: null};
+
+exports.checkShots = function(ship, shots) {
+  // For now, let's pretend shots have no dimension,
+  // they're just a point
+
+  var collisions = EMPTY_LIST;
+  for (var i=0; i < shots.length; i++) {
+    var shot = shots[i];
+    // First check bounding box
+    if (Math.abs(ship.pos.x - shot.pos.x) < boundingRadius) {
+      if (Math.abs(ship.pos.y - shot.pos.y) < boundingRadius) {
+        collisions = collisions.concat(i);
+      }
+    }
+  }
+
+  return collisions;
+}
