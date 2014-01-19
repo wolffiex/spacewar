@@ -42,13 +42,15 @@ module.exports.getStream = (doc) => {
       thrust: false,
       right: false,
     },
+    // l is for local
+    l: true,
   };
 
   return Rx.Observable.returnValue(initialKeys).concat(
     keyStream.scan(initialKeys, function(old, input) {
       var nextKeys = _.clone(old.k);
       nextKeys[input.action] = input.isDown;
-      return {t: Date.now(), k: nextKeys};
+      return {t: Date.now() - global.tGameStart, k: nextKeys, l:true};
     }).share());
 
 }

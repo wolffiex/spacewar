@@ -13,23 +13,46 @@ var Keys = require('./Keys');
 var Shots = require('./Shots');
 
 var GameRenderer = null;
-var tGameStart = null;
-function startGame(t) {
+global.tGameStart = null;
+function startGame(t, otherInput) {
   if (!GameRenderer) throw "Game didn't init"
   tGameStart = t;
 
-  console.log(GameRenderer)
+  otherInput.subscribe(OtherInput);
   requestAnimationFrame(GameRenderer);
   return KeyInput;
 
 }
 
 var KeyInput = null;
+var OtherInput = null;
+var amA = true;
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
 
   KeyInput = Keys.getStream(document);
+  OtherInput = new Rx.Subject();
 
+  // This must syncrhonize the input stream
+  var inputStream = KeyInput.merge(OtherInput);
+
+  var allInput = inputStream.scan({a: {t:0}, b: {t:0}}, function(input, next) {
+      var k = amA == next.l ? 'a' : 'b';
+      console.log(next.l)
+      var oppositeK = k == 'a' ? 'b' : 'a';
+      //if (next.t < input[k].t) console.log(k, input.a, input.b)
+      if (next.t < input[k].t) throw( 'Out of order from server');
+
+      if (next.t < input[oppositeK].t) {
+        console.log(input, next)
+        throw ('Needs replay');
+      }
+
+      input[k] = next;
+      return input;
+    });
+
+  allInput.subscribe(x => x);//console.log(x));
 
   // When we push a time value onto the updater, it makes a new entry in the
   // keyBuffer for that time. This produces a new value for the ship
@@ -37,7 +60,7 @@ function initGame(canvas){
   var updater = new Rx.Subject();
   var carrier = {t:null};
   function updateSimulation() {
-    carrier.t = Date.now();
+    carrier.t = Date.now() - tGameStart;
     updater.onNext(carrier);
   }
 
@@ -204,4 +227,3 @@ socket.onmessage = function (event) {
       break;
   }
 }
-

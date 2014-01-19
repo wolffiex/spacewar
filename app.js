@@ -37,7 +37,9 @@ server.on('connection', function(connection) {
         send('START', Date.now());
         break;
       case 'INPUT':
+        o.d.l = false;
         send('INPUT', o.d);
+        //setTimeout(function(){send('INPUT', o.d);}, 100);
         break;
     }
   });
