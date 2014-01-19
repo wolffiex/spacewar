@@ -108,6 +108,7 @@ exports.checkShots = function(ship, shots) {
     // First check bounding box
     if (Math.abs(ship.pos.x - shot.pos.x) < boundingRadius) {
       if (Math.abs(ship.pos.y - shot.pos.y) < boundingRadius) {
+        // Now need to do detailed check
         collisions = collisions.concat(i);
       }
     }

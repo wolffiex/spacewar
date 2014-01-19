@@ -162,3 +162,22 @@ function initGame(canvas){
 }
 
 global.initGame = initGame;
+
+var socket = new WebSocket("ws://localhost:3001");
+socket.onopen = function (event) {
+  console.log('socket is open')
+};
+
+socket.onmessage = function (event) {
+  var d = JSON.parse(event.data);
+  console.log(d);
+  switch (d.c) {
+    case 'CONNECT':
+      socket.send(JSON.stringify({c: 'CONNECT', t:Date.now()}));
+      break;
+    case 'START':
+      socket.send(JSON.stringify({c: 'START', t:Date.now()}));
+      break;
+  }
+}
+
