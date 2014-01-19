@@ -81,17 +81,26 @@ function initGame(canvas){
     var keys = inputs.last.k;
     var startFire = !keys.fire && inputs.next.k.fire;
 
-    for (var t = inputs.last.t; t < inputs.next.t; t++) {
+    var startT = inputs.last.t
+    var tCheckShipBShotsA = startT
+
+    for (var t = startT; t < inputs.next.t; t++) {
       if (keys) {
         shipA = Ship.inputTick(shipA, keys);
-        shipA.shots = Shots.cull(shipA.shots, t);
+        shipA.shots = Shots.tick(shipA.shots);
+
         if (keys.fire) {
-          shipA.shots = Shots.repeatFire(shipA, t);
+          shipA.shots = Shots.repeatFire(shipA);
         }
+      }
+
+      if (tCheckShipBShotsA == t) {
+        //var {collisions, nextCheck} = Ship.checkShots(shipB, shipA.shots);
       }
     }
 
     if (startFire) shipA.shots = Shots.startFire(shipA, t);
+
 
     // not necessary since these functions are mutative, but
     // it would be nice if they didn't have to be

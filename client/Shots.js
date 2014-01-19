@@ -10,19 +10,46 @@ var SHOTS = {
 };
 
 // Mutates shots
-exports.cull = function(shots, t) {
-  return _.filter(shots, function(shot) {
-    return t - shot.t < SHOTS.life;
+function cull(shots) {
+  return 
+}
+
+exports.tick = function(shots) {
+  var keepAll = true;
+  for (var i=0; i < shots.length; i++) {
+    var shot = shots[i];
+    if (shot.age++ >= SHOTS.life) keepAll = false;
+
+    var x = shot.pos.x;
+    var y = shot.pos.y;
+
+    x += shot.spd.x;
+    y += shot.spd.y;
+
+    var ssX = Point.screenSize.x;
+    var ssY = Point.screenSize.y;
+
+    if (x < 0) x += ssX;
+    if (y < 0) y += ssY;
+    if (x > ssX) x -= ssX;
+    if (y > ssY) y -= ssY;
+
+    shot.pos.x = x;
+    shot.pos.y = y;
+  }
+
+  return keepAll ? shots : _.filter(shots, function(shot) {
+    return shot.age < SHOTS.life;
   });
 }
 
 // Mutates ship.shots
-function tryFire(ship, t) {
+function tryFire(ship) {
   var shots = ship.shots;
   if (shots.length < SHOTS.max) {
     var r = ship.rot;
     shots.push({
-      t: t,
+      age: 0,
       pos : {
         x : ship.pos.x + Point.rotateX(Ship.nose, r),
         y : ship.pos.y + Point.rotateY(Ship.nose, r),
@@ -38,28 +65,29 @@ function tryFire(ship, t) {
 }
 
 // Mutates ship.shots
-exports.startFire = function(ship, t) {
-  return tryFire(ship, t);
+exports.startFire = function(ship) {
+  return tryFire(ship);
 }
 
 // Mutates ship.shots
-exports.repeatFire = function(ship, t) {
+exports.repeatFire = function(ship) {
   var shots = ship.shots;
-  var lastT = shots.length ? _.last(shots).t : 0;
-  if (t - lastT > SHOTS.delay ) shots = tryFire(ship, t);
+  var lastAge = shots.length ? _.last(shots).age : 0;
+  if (lastAge > SHOTS.delay ) shots = tryFire(ship);
   return shots;
 }
 
-exports.draw = function(ctx, shotList, t) {
+exports.draw = function(ctx, shotList) {
   shotList.forEach(function(shot) {
-    var dt = Date.now() - shot.t;
 
-    var x = shot.pos.x + shot.spd.x * dt;;
-    var y = shot.pos.y + shot.spd.y * dt;;
+    var x = shot.pos.x;
+    var y = shot.pos.y;
+
     x = x % Point.screenSize.x;
     y = y % Point.screenSize.y;
     if (x < 0) x += Point.screenSize.x;
     if (y < 0) y += Point.screenSize.y;
+
     ctx.beginPath();
     ctx.arc(x, y, 2, 0, Math.PI*2, true); 
     ctx.closePath();

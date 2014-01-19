@@ -44,7 +44,8 @@ var rotSpeed = 0.003;
 var thrustAccel = {x: 0.0002, y: 0};
 var maxSpd = {x:0.4, y:0};
 var maxSpdHyp = maxSpd.x * maxSpd.x;
-// This mutatates the ship data!
+
+// Mutates ship
 exports.inputTick = function(ship, keys) {
   if (keys.left)  ship.rot -= rotSpeed;
   if (keys.right) ship.rot += rotSpeed;
@@ -92,3 +93,4 @@ exports.inputTick = function(ship, keys) {
 
 exports.nose = shipPoly[0];
 exports.draw = draw;
+exports.boundingRadius = 15;
