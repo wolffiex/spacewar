@@ -12,10 +12,24 @@ var Point = require('./Point');
 var Keys = require('./Keys');
 var Shots = require('./Shots');
 
+var GameRenderer = null;
+var tGameStart = null;
+function startGame(t) {
+  if (!GameRenderer) throw "Game didn't init"
+  tGameStart = t;
+
+  console.log(GameRenderer)
+  requestAnimationFrame(GameRenderer);
+  return KeyInput;
+
+}
+
+var KeyInput = null;
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
 
-  var keyInput = Keys.getStream(document);
+  KeyInput = Keys.getStream(document);
+
 
   // When we push a time value onto the updater, it makes a new entry in the
   // keyBuffer for that time. This produces a new value for the ship
@@ -49,7 +63,7 @@ function initGame(canvas){
     ships: initialShips,
   } 
 
-  var keyBuffer = keyInput.merge(updater).scan({
+  var keyBuffer = KeyInput.merge(updater).scan({
     last: {t:null, k:{}},
     next: {t:null, k:{}},
   }, function(input, next) {
@@ -137,7 +151,7 @@ function initGame(canvas){
     renderInfo.collisions = state.collisions;
   });
 
-  function render(time) {
+  GameRenderer = function (time) {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, Point.screenSize.x, Point.screenSize.y);
 
@@ -154,11 +168,10 @@ function initGame(canvas){
       Shots.drawCollisions(ctx, renderInfo.collisions);
     }
 
-    requestAnimationFrame(render);
+    requestAnimationFrame(GameRenderer);
     _.defer(updateSimulation);
   };
 
-  requestAnimationFrame(render);
 }
 
 global.initGame = initGame;
@@ -168,15 +181,26 @@ socket.onopen = function (event) {
   console.log('socket is open')
 };
 
+function send(message, data) {
+  socket.send(JSON.stringify({m: message, d:data}));
+}
+
+
+var otherInput = new Rx.Subject();
 socket.onmessage = function (event) {
-  var d = JSON.parse(event.data);
-  console.log(d);
-  switch (d.c) {
+  var o = JSON.parse(event.data);
+  //console.log(o);
+  switch (o.m) {
     case 'CONNECT':
-      socket.send(JSON.stringify({c: 'CONNECT', t:Date.now()}));
+      send('CONNECT', Date.now());
       break;
     case 'START':
-      socket.send(JSON.stringify({c: 'START', t:Date.now()}));
+      var input = startGame(Date.now(), otherInput);
+      input.subscribe(k => send('INPUT', k));
+      break;
+    case 'INPUT':
+      //console.log('input', o.d)
+      otherInput.onNext(o.d);
       break;
   }
 }
