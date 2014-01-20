@@ -35,10 +35,58 @@ function initGame(canvas){
   OtherInput = new Rx.Subject();
 
   // This must syncrhonize the input stream
-  var inputStream = KeyInput.merge(OtherInput).map(input => {
+  var inputStreamRaw = KeyInput.merge(OtherInput).map(input => {
     input.k = input.l && amA ? 'a' : 'b';
     return input;
   });
+
+
+  var inputBufferList = [{t:0}];
+
+  var inputBuffer = inputStreamRaw.map(next => {
+    var list = inputBufferList;
+    var ot = _.last(list).t;
+
+    // we need to put this at the last possible spot
+    // e.g. list = {t:0}, {t:1}, {t:1}, {t:3}
+    // and we receive a new {t:1}, it has to go right before t:3
+    var z = list.length;
+    var y = z-1;
+    list.push(next);
+
+    var needsBuffering = false;
+    while(list[y].t > list[z].t) {
+      needsBuffering = true;
+      var tmp = list[z];
+      list[z] = list[y];
+      list[y] = tmp;
+      y--; z--;
+    }
+
+    if (needsBuffering) {
+      //console.log('bout of order', next, list.slice(y+1));
+      return {
+        idx: y+1,
+        buffer: list
+      };
+    }
+
+    // TODO: Trim list
+  }).filter(x => !!x);
+
+  var replay = inputBuffer.map(info => Rx.Observable.fromArray(
+    info.buffer.slice(info.idx)));
+
+  var orderT = 0;
+  var ordered = inputStreamRaw.filter(o => {
+    if (orderT > o.t) {
+      return false;
+    }
+    orderT = o.t;
+    return true;
+  });
+
+  var inputStream = replay.switch().merge(ordered);
 
   // When we push a time value onto the updater, it makes a new entry in the
   // keyBuffer for that time. This produces a new value for the ship
@@ -58,21 +106,21 @@ function initGame(canvas){
       shots: [],
     },
 
-    /*
     b: {
       pos: {x:100, y:100},
       spd: {x:0, y:0},
       rot: Math.PI,
       shots: [],
     },
-    */
 
+    /*
     b: {
       pos: {x:300, y:300},
       spd: {x:0, y:0},
       rot: 0,
       shots: [],
     },
+    */
   });
 
   var initialState = Object.freeze({
@@ -82,17 +130,42 @@ function initGame(canvas){
     ships: initialShips,
   });
 
-  var stateBuffer = [deepCopy(initialState)];
+  var stateBuffer = [initialState];
   // This is an optimization
-  var lastState = _.last(stateBuffer);
+  var lastState = deepCopy(initialState);
   var playerList = ['a', 'b'];
+  var showNextTick = false;
   var loop = inputStream.merge(simulator).map(input => {
-    var state = lastState;
     if (lastState.t > input.t) {
+      // At the very least, lastState is out of date, so we will
+      // take the last state from the stateBuffer. It's possible
+      // that the last entry on the stateBuffer is good, though
+
       // Out of order input, need to fix up stateBuffer
       // and reassign state
-      console.log('out of order')
+      var sbl = stateBuffer.length;
+      var idx = sbl-1;
+      while(stateBuffer[idx].t > input.t) {
+        if (idx ==0) throw "Fell too far behind";
+        idx--;
+      }
+
+      showNextTick = true;
+
+      if (idx < sbl-1) {
+        //console.log('drop', stateBuffer, lastState.t, input.t, idx+1 - stateBuffer.length);
+        stateBuffer = stateBuffer.slice(0, idx+1);
+      }
+
+      lastState = deepCopy(_.last(stateBuffer));
     }
+
+    if (lastState.t > _.last(stateBuffer.t)) {
+      //console.log(lastState, stateBuffer)
+      throw 'whaa';
+    }
+
+    var state = lastState;
 
     var isNewInput = !!input.keys;
     var shipA = state.ships.a;
@@ -152,11 +225,11 @@ function initGame(canvas){
     if (isNewInput) {
       state.keys[input.l ? 'a' : 'b'] =  input.keys;
       // save a copy of state in case we need to rewind
-      stateBuffer[stateBuffer.length-1] = Object.freeze(deepCopy(state));
-      stateBuffer.push(state);
+      stateBuffer.push(Object.freeze(deepCopy(state)));
       if (stateBuffer.length > 30) {
         stateBuffer = stateBuffer.slice(15);
       }
+      
     }
 
     // Only spit out state for simulator times
