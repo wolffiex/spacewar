@@ -37,7 +37,7 @@ module.exports.getStream = (doc) => {
 
   var initialKeys = {
     t: 0,
-    k: {
+    keys: {
       left: false,
       thrust: false,
       right: false,
@@ -48,9 +48,9 @@ module.exports.getStream = (doc) => {
 
   return Rx.Observable.returnValue(initialKeys).concat(
     keyStream.scan(initialKeys, function(old, input) {
-      var nextKeys = _.clone(old.k);
+      var nextKeys = _.clone(old.keys);
       nextKeys[input.action] = input.isDown;
-      return {t: Date.now() - global.tGameStart, k: nextKeys, l:true};
+      return {t: Date.now() - global.tGameStart, keys: nextKeys, l:true};
     }).share());
 
 }
