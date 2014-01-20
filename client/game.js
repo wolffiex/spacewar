@@ -18,7 +18,7 @@ function startGame(t, otherInput) {
   if (!GameRenderer) throw "Game didn't init"
   tGameStart = t;
 
-  otherInput.subscribe(OtherInput);
+  //otherInput.subscribe(OtherInput);
   requestAnimationFrame(GameRenderer);
   return KeyInput;
 
@@ -36,32 +36,14 @@ function initGame(canvas){
   // This must syncrhonize the input stream
   var inputStream = KeyInput.merge(OtherInput);
 
-  var allInput = inputStream.scan({a: {t:0}, b: {t:0}}, function(input, next) {
-      var k = amA == next.l ? 'a' : 'b';
-      console.log(next.l)
-      var oppositeK = k == 'a' ? 'b' : 'a';
-      //if (next.t < input[k].t) console.log(k, input.a, input.b)
-      if (next.t < input[k].t) throw( 'Out of order from server');
-
-      if (next.t < input[oppositeK].t) {
-        console.log(input, next)
-        throw ('Needs replay');
-      }
-
-      input[k] = next;
-      return input;
-    });
-
-  allInput.subscribe(x => x);//console.log(x));
-
   // When we push a time value onto the updater, it makes a new entry in the
   // keyBuffer for that time. This produces a new value for the ship
   // position
-  var updater = new Rx.Subject();
+  var simulator = new Rx.Subject();
   var carrier = {t:null};
   function updateSimulation() {
     carrier.t = Date.now() - tGameStart;
-    updater.onNext(carrier);
+    simulator.onNext(carrier);
   }
 
 
@@ -82,46 +64,28 @@ function initGame(canvas){
   };
 
   var initialState = {
+    t: 0,
+    k: {},
     collisions: [],
     ships: initialShips,
   } 
 
-  var keyBuffer = KeyInput.merge(updater).scan({
-    last: {t:null, k:{}},
-    next: {t:null, k:{}},
-  }, function(input, next) {
-    // This is tricky, but it's optimized for render loop,
-    // to avoid object creation
-    input.last.t = input.next.t;
-    input.last.k = input.next.k;
-
-    if (next.k) {
-      // This is actual input
-      input.next = next;
-    } else {
-      // This is input we're fabricating to drive the render loop
-      input.next.t = next.t;
-      input.next.k = input.last.k;
+  var stateBuffer = [initialState];
+  // This is an optimization
+  var lastState = initialState;
+  var loop = KeyInput.merge(simulator).map(input => {
+    var state = lastState;
+    if (lastState.t > input.t) {
+      // Out of order input, need to fix up stateBuffer
+      // and reassign state
     }
 
-    // FIXME
-    if (!input.last.t) {
-      input.last.t = input.next.t;
-    }
-
-    return input;
-  });
-
-  var loop = keyBuffer.scan(initialState, function(state, inputs) {
+    var isNewInput = !!input.k;
     var shipA = state.ships.a;
     var shipB = state.ships.b;
+    var keys = state.k;
 
-    var keys = inputs.last.k;
-    var startFire = !keys.fire && inputs.next.k.fire;
-
-    var startT = inputs.last.t
-
-    for (var t = startT; t < inputs.next.t; t++) {
+    for (var t = state.t; t < input.t; t++) {
       if (keys) {
         shipA = Ship.inputTick(shipA, keys);
         shipA.shots = Shots.tickShots(shipA.shots);
@@ -153,16 +117,30 @@ function initGame(canvas){
       }
     }
 
+    var startFire = isNewInput && !keys.fire && input.k.fire;
     if (startFire) shipA.shots = Shots.startFire(shipA, t);
 
-
+    state.t = input.t;
     // not necessary since these functions are mutative, but
     // it would be nice if they didn't have to be
     state.ships.a = shipA;
     state.ships.b = shipB;
-    return state;
-  });
+    if (isNewInput) {
+      state.k = input.k;
+      // save a copy of state in case we need to rewind
+      stateBuffer[stateBuffer.length-1] = deepCopy(state);
+      stateBuffer.push(state);
+      if (stateBuffer.length > 30) {
+        stateBuffer = stateBuffer.slice(15);
+      }
+    }
 
+    // Only spit out state for simulator times
+    // This doesn't matter much here, but it could if
+    // the simulator were driving the renderer
+    return isNewInput ? null : state;
+  }).filter(s => !!s);
+  
   var renderInfo = {
     ships : initialShips,
     collisions : [],
@@ -170,8 +148,10 @@ function initGame(canvas){
 
   // This is optimized not to create an object
   loop.subscribe(state => {
-    renderInfo.ships = state.ships;
-    renderInfo.collisions = state.collisions;
+    if (state) {
+      renderInfo.ships = state.ships;
+      renderInfo.collisions = state.collisions;
+    }
   });
 
   GameRenderer = function (time) {
@@ -226,4 +206,8 @@ socket.onmessage = function (event) {
       otherInput.onNext(o.d);
       break;
   }
+}
+
+function deepCopy(o) {
+  return JSON.parse(JSON.stringify(o));
 }
