@@ -47,7 +47,7 @@ function initGame(canvas){
   }
 
 
-  var initialShips = {
+  var initialShips = Object.freeze({
     a: {
       pos: {x:100, y:100},
       spd: {x:0, y:0},
@@ -61,18 +61,18 @@ function initGame(canvas){
       rot: 0,
       shots: [],
     },
-  };
+  });
 
-  var initialState = {
+  var initialState = Object.freeze({
     t: 0,
     k: {},
     collisions: [],
     ships: initialShips,
-  } 
+  });
 
-  var stateBuffer = [initialState];
+  var stateBuffer = [deepCopy(initialState)];
   // This is an optimization
-  var lastState = initialState;
+  var lastState = _.last(stateBuffer);
   var loop = KeyInput.merge(simulator).map(input => {
     var state = lastState;
     if (lastState.t > input.t) {
@@ -128,7 +128,7 @@ function initGame(canvas){
     if (isNewInput) {
       state.k = input.k;
       // save a copy of state in case we need to rewind
-      stateBuffer[stateBuffer.length-1] = deepCopy(state);
+      stateBuffer[stateBuffer.length-1] = Object.freeze(deepCopy(state));
       stateBuffer.push(state);
       if (stateBuffer.length > 30) {
         stateBuffer = stateBuffer.slice(15);
