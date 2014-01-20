@@ -50,7 +50,6 @@ function initGame(canvas){
     simulator.onNext(carrier);
   }
 
-
   var initialShips = Object.freeze({
     a: {
       pos: {x:100, y:100},
@@ -59,21 +58,21 @@ function initGame(canvas){
       shots: [],
     },
 
+    /*
     b: {
       pos: {x:100, y:100},
       spd: {x:0, y:0},
       rot: Math.PI,
       shots: [],
     },
+    */
 
-    /*
     b: {
       pos: {x:300, y:300},
       spd: {x:0, y:0},
       rot: 0,
       shots: [],
     },
-    */
   });
 
   var initialState = Object.freeze({
@@ -116,26 +115,27 @@ function initGame(canvas){
         }
         state.ships[k] = ship;
 
+        var newCollisions = Ship.checkShots(oShip, ship.shots);
+
+        if (newCollisions.length) {
+          // this mutates shipA.shots
+          var shots = ship.shots;
+
+          _.each(newCollisions, function(shotIndex) {
+            //
+            var collision = shots[shotIndex];
+            shots[shotIndex] = null;
+            collision.age = 0;
+            collision.spd.x /= 2;
+            collision.spd.y /= 2;
+
+            state.collisions = state.collisions.concat(collision);
+          });
+
+          ship.shots = _.compact(shots);
+        }
       });
 
-      var newCollisions = Ship.checkShots(shipB, shipA.shots);
-
-      if (newCollisions.length) {
-        // this mutates shipA.shots
-        var shots = shipA.shots;
-
-        _.each(newCollisions, function(shotIndex) {
-          //
-          var collision = shots[shotIndex];
-          shots[shotIndex] = null;
-          collision.age = 0;
-          collision.spd.x /= 2;
-          collision.spd.y /= 2;
-
-          state.collisions = state.collisions.concat(collision);
-        });
-        shipA.shots = _.compact(shots);
-      }
     }
 
     var startFire = isNewInput && input.keys.fire;
@@ -190,6 +190,10 @@ function initGame(canvas){
     ctx.fillStyle = '#0FF';
     var shotsA = renderInfo.ships.a.shots;
     if (shotsA.length) Shots.draw(ctx, shotsA);
+
+    var shotsB = renderInfo.ships.b.shots;
+    ctx.fillStyle = '#F0F';
+    if (shotsB.length) Shots.draw(ctx, shotsB);
 
     if (renderInfo.collisions.length) {
       Shots.drawCollisions(ctx, renderInfo.collisions);
