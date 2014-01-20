@@ -18,7 +18,7 @@ function startGame(t, otherInput) {
   if (!GameRenderer) throw "Game didn't init"
   tGameStart = t;
 
-  //otherInput.subscribe(OtherInput);
+  otherInput.subscribe(OtherInput);
   requestAnimationFrame(GameRenderer);
   return KeyInput;
 
@@ -65,7 +65,7 @@ function initGame(canvas){
 
   var initialState = Object.freeze({
     t: 0,
-    k: {},
+    keys: {a: {}, b: {}},
     collisions: [],
     ships: initialShips,
   });
@@ -73,29 +73,37 @@ function initGame(canvas){
   var stateBuffer = [deepCopy(initialState)];
   // This is an optimization
   var lastState = _.last(stateBuffer);
-  var loop = KeyInput.merge(simulator).map(input => {
+  var playerList = ['a', 'b'];
+  var loop = inputStream.merge(simulator).map(input => {
     var state = lastState;
     if (lastState.t > input.t) {
       // Out of order input, need to fix up stateBuffer
       // and reassign state
+      console.log('out of order')
     }
 
     var isNewInput = !!input.k;
     var shipA = state.ships.a;
     var shipB = state.ships.b;
-    var keys = state.k;
+
 
     for (var t = state.t; t < input.t; t++) {
-      if (keys) {
-        shipA = Ship.inputTick(shipA, keys);
-        shipA.shots = Shots.tickShots(shipA.shots);
+      state.collisions = Shots.tickCollisions(state.collisions);
+
+      playerList.forEach(k => {
+        var oK = k == 'a' ? 'b' : 'a';
+
+        var ship = state.ships[k];
+        var keys = state.keys[k];
+
+        ship = Ship.inputTick(ship, keys);
+        ship.shots = Shots.tickShots(ship.shots);
 
         if (keys.fire) {
-          shipA.shots = Shots.repeatFire(shipA);
+          ship.shots = Shots.repeatFire(ship);
         }
-      }
-
-      state.collisions = Shots.tickCollisions(state.collisions);
+        state.ships[k] = ship;
+      });
 
       var newCollisions = Ship.checkShots(shipB, shipA.shots);
 
@@ -117,8 +125,10 @@ function initGame(canvas){
       }
     }
 
-    var startFire = isNewInput && !keys.fire && input.k.fire;
-    if (startFire) shipA.shots = Shots.startFire(shipA, t);
+    var startFire = isNewInput && input.k.fire;
+    if (startFire) {
+      //shipA.shots = Shots.startFire(shipA, t);
+    }
 
     state.t = input.t;
     // not necessary since these functions are mutative, but
@@ -126,7 +136,7 @@ function initGame(canvas){
     state.ships.a = shipA;
     state.ships.b = shipB;
     if (isNewInput) {
-      state.k = input.k;
+      state.keys[input.l ? 'a' : 'b'] =  input.k;
       // save a copy of state in case we need to rewind
       stateBuffer[stateBuffer.length-1] = Object.freeze(deepCopy(state));
       stateBuffer.push(state);
