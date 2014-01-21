@@ -32,15 +32,17 @@ var amA = true;
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
 
-  KeyInput = Keys.getStream(document);
+  KeyInput = Keys.getStream(document).map(input => {
+    console.log(Date.now(), tGameStart)
+    input.t = Date.now() - tGameStart;
+    input.k = amA ? 'a' : 'b';
+    return input;
+  }).share();
+
   OtherInput = new Rx.Subject();
 
   // This must syncrhonize the input stream
-  var inputStreamRaw = KeyInput.merge(OtherInput).map(input => {
-    input.k = input.l && amA ? 'a' : 'b';
-    return input;
-  });
-
+  var inputStreamRaw = KeyInput.merge(OtherInput);
 
   var inputBufferList = [{t:0}];
 
@@ -88,6 +90,8 @@ function initGame(canvas){
   });
 
   var inputStream = replay.switch().merge(ordered);
+
+  inputStream.subscribe(x=>console.log(x));
 
   // When we push a time value onto the updater, it makes a new entry in the
   // keyBuffer for that time. This produces a new value for the ship
@@ -139,7 +143,7 @@ function initGame(canvas){
 
     var state = lastState;
 
-    var isNewInput = !!input.keys;
+    var isNewInput = !!input.action;
     var shipA = state.ships.a;
     var shipB = state.ships.b;
 
@@ -183,8 +187,8 @@ function initGame(canvas){
 
     }
 
-    var startFire = isNewInput && input.keys.fire;
-    if (startFire) {
+    if (input.action == 'fire' && input.isDown) {
+      console.log('start fire')
       var ship = state.ships[input.k];
       ship.shots = Shots.startFire(ship, t);
     }
@@ -195,7 +199,8 @@ function initGame(canvas){
     state.ships.a = shipA;
     state.ships.b = shipB;
     if (isNewInput) {
-      state.keys[input.l ? 'a' : 'b'] =  input.keys;
+      var keys = state.keys[input.k];
+      keys[input.action] = input.isDown;
       // save a copy of state in case we need to rewind
       stateBuffer.push(Object.freeze(deepCopy(state)));
       if (stateBuffer.length > 30) {

@@ -27,32 +27,12 @@ exports.getStream = (doc) => {
     });
   }
 
-  var keyStream = keyUps.filter(isPositionKey).map(keyMapper(false))
+  return keyUps.filter(isPositionKey).map(keyMapper(false))
     .merge(keyDowns.filter(isPositionKey).map(keyMapper(true)))
     .distinctUntilChanged(function(val){
-      // putting the filter here rather than on the action stream
-      // means that we end up creating some duplicate key states
-      // but this is harmless, and it saves object creation in the
-      // common case
+      // putting the filter here rather means that we end up creating some
+      // duplicate key states when two keys are down, but this is harmless
       return val.action + (val.isDown ? '1' : '0');
     });
-
-  var initialKeys = {
-    t: 0,
-    keys: {
-      left: false,
-      thrust: false,
-      right: false,
-    },
-    // l is for local
-    l: true,
-  };
-
-  return Rx.Observable.returnValue(initialKeys).concat(
-    keyStream.scan(initialKeys, function(old, input) {
-      var nextKeys = _.clone(old.keys);
-      nextKeys[input.action] = input.isDown;
-      return {t: Date.now() - global.tGameStart, keys: nextKeys, l:true};
-    }).share());
 
 }
