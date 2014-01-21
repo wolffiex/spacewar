@@ -62,7 +62,7 @@ exports.startServer = function (options) {
     connection.onNext(Msg('WAITING', Date.now()));
   });
 
-  var loopback = true;
+  var loopback = false;
   if (loopback) {
     server = server.flatMap(function(connection) {
       var looped = loopbackConnection(connection);
@@ -117,6 +117,8 @@ function mapPlayer(k, connection) {
     }
   }
 
+  player.onCompleted = player.onError = connection.onCompleted.bind(connection);
+
   return player;
 }
 
@@ -136,6 +138,7 @@ function loopbackConnection(connection) {
 
   // drop input to the loopback
   looped.onNext = function(output) { };
+  looped.onCompleted = looped.onError = connection.onCompleted.bind(connection);
 
   return looped;
 }
