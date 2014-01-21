@@ -3,6 +3,9 @@ var express = require('express');
 var app = express();
 var _ = require('./common/underscore');
 
+var Rx = require('./common/rx/rx');
+var Game = require('./Game');
+
 browserify.settings('transform', ['es6ify']);
 
 app.use(express.static('./static'));
@@ -25,6 +28,9 @@ var server = new ws.Server({port: 3001});
 
 var games = [{a: {}, b:{}}];
 server.on('connection', function(connection) {
+  var in_ = new Rx.Subject();
+
+  var out = Game.getOut(in_);
 
   var player;
   var game = _.last(games);

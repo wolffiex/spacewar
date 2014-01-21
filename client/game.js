@@ -14,6 +14,7 @@ var Shots = require('./Shots');
 
 var GameRenderer = null;
 global.tGameStart = null;
+
 function startGame(t, otherInput) {
   if (!GameRenderer) throw "Game didn't init"
   tGameStart = t;
@@ -98,36 +99,8 @@ function initGame(canvas){
     simulator.onNext(carrier);
   }
 
-  var initialShips = Object.freeze({
-    a: {
-      pos: {x:100, y:100},
-      spd: {x:0, y:0},
-      rot: Math.PI,
-      shots: [],
-    },
 
-    /*
-    b: {
-      pos: {x:100, y:100},
-      spd: {x:0, y:0},
-      rot: Math.PI,
-      shots: [],
-    },*/
-
-    b: {
-      pos: {x:300, y:300},
-      spd: {x:0, y:0},
-      rot: 0,
-      shots: [],
-    },
-  });
-
-  var initialState = Object.freeze({
-    t: 0,
-    keys: {a: {}, b: {}},
-    collisions: [],
-    ships: initialShips,
-  });
+  var initialState = Object.freeze(getInitialState()); 
 
   var stateBuffer = [initialState];
   // This is an optimization
@@ -238,7 +211,7 @@ function initGame(canvas){
   }).filter(s => !!s);
   
   var renderInfo = {
-    ships : initialShips,
+    ships : initialState.ships,
     collisions : [],
   };
 
@@ -306,6 +279,36 @@ socket.onmessage = function (event) {
       otherInput.onNext(o.d);
       break;
   }
+}
+
+function getInitialState() {
+  var t = 0;
+
+  var initialKeys = _.reduce(Keys.actions, (o, action) =>{
+    o[action] = false;
+    return o;
+  }, {});
+
+  var keys = {a: initialKeys, b: initialKeys};
+  var collisions = [];
+
+  var shipA = {
+    pos: {x:100, y:100},
+    spd: {x:0, y:0},
+    rot: Math.PI,
+    shots: [],
+  };
+
+  var shipB = {
+    pos: {x:200, y:200},
+    spd: {x:0, y:0},
+    rot: 0,
+    shots: [],
+  };
+
+  var ships = {a: shipA, b: shipB}
+
+  return {t, keys, collisions, ships};
 }
 
 function deepCopy(o) {

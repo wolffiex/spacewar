@@ -1,14 +1,16 @@
 var _ = require('../common/underscore');
 var Rx = require('../common/rx/rx');
 
-module.exports.getStream = (doc) => {
+var KEY_CODES = {
+  37: 'left',
+  38: 'thrust',
+  39: 'right',
+  32: 'fire',
+};
 
-  var positionKeys = {
-    37: 'left',
-    38: 'thrust',
-    39: 'right',
-    32: 'fire',
-  }
+exports.actions = _.values(KEY_CODES);
+
+exports.getStream = (doc) => {
 
   // Get keyCode of first event
   var getKeyCode = args => args[0].keyCode;
@@ -16,11 +18,11 @@ module.exports.getStream = (doc) => {
   var keyUps = Rx.Observable.fromEvent(doc, 'keyup', getKeyCode);
   var keyDowns = Rx.Observable.fromEvent(doc, 'keydown', getKeyCode);
 
-  var isPositionKey = keyCode => keyCode in positionKeys;
+  var isPositionKey = keyCode => keyCode in KEY_CODES;
 
   function keyMapper(isDown) {
     return keyCode => ({
-      action: positionKeys[keyCode],
+      action: KEY_CODES[keyCode],
       isDown: isDown,
     });
   }
