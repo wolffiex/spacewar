@@ -48,7 +48,7 @@ function initGame(canvas){
 
   var inputBufferList = [{t:0}];
 
-  var inputBuffer = inputStreamRaw.map(next => {
+  var inputStream = inputStreamRaw.flatMap(input => {
     var list = inputBufferList;
     var ot = _.last(list).t;
 
@@ -57,7 +57,7 @@ function initGame(canvas){
     // and we receive a new {t:1}, it has to go right before t:3
     var z = list.length;
     var y = z-1;
-    list.push(next);
+    list.push(input);
 
     var needsBuffering = false;
     while(list[y].t > list[z].t) {
@@ -68,30 +68,12 @@ function initGame(canvas){
       y--; z--;
     }
 
-    if (needsBuffering) {
-      //console.log('bout of order', next, list.slice(y+1));
-      return {
-        idx: y+1,
-        buffer: list
-      };
-    }
-
     // TODO: Trim list
-  }).filter(x => !!x);
 
-  var replay = inputBuffer.map(info => Rx.Observable.fromArray(
-    info.buffer.slice(info.idx)));
-
-  var orderT = 0;
-  var ordered = inputStreamRaw.filter(o => {
-    if (orderT > o.t) {
-      return false;
-    }
-    orderT = o.t;
-    return true;
+    return needsBuffering ?
+      Rx.Observable.fromArray(list.slice(y+1)) :
+      Rx.Observable.returnValue(input);
   });
-
-  var inputStream = replay.switch().merge(ordered);
 
   // When we push a time value onto the updater, it makes a new entry in the
   // keyBuffer for that time. This produces a new value for the ship
