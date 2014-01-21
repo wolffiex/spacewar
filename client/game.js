@@ -6,6 +6,7 @@ require('../common/rx/rx.coincidence');
 require('../common/rx/rx.time');
 
 var _ = require('../common/underscore');
+var deepCopy = require('../common/deepCopy');
 
 var Ship = require('./Ship');
 var Point = require('./Point');
@@ -296,8 +297,4 @@ function getInitialState() {
   var ships = {a: shipA, b: shipB}
 
   return {t, keys, collisions, ships};
-}
-
-function deepCopy(o) {
-  return JSON.parse(JSON.stringify(o));
 }

@@ -1,5 +1,6 @@
 var Rx = require('./common/rx/rx');
 var Rx = require('./common/rx/rx.binding');
+var deepCopy = require('./common/deepCopy');
 var ws = require('ws');
 
 function WebSocketConnection(ws) {
@@ -31,15 +32,14 @@ function WebSocketConnection(ws) {
   connection.onNext = function(message) {
     ws.send(JSON.stringify(message));
   };
+
   connection.onCompleted = connection.onError = function() {
     connection.isClosed = true;
     ws.close();
   };
 
-  connection.n = n++;
   return connection;
 };
-var n = 0;
 
 var Msg = function(msg, data){ return {m: msg, d: data} };
 
@@ -61,6 +61,14 @@ exports.startServer = function (options) {
   var lobby = server.subscribe(function(connection) {
     connection.onNext(Msg('WAITING', Date.now()));
   });
+
+  var loopback = true;
+  if (loopback) {
+    server = server.flatMap(function(connection) {
+      var looped = loopbackConnection(connection);
+      return Rx.Observable.fromArray([connection, looped]);
+    });
+  }
 
   server.bufferWithCount(2).subscribe(function (pair) {
     var connectCount = 0;
@@ -112,8 +120,22 @@ function mapPlayer(k, connection) {
   return player;
 }
 
-function getPlayerFilter(game, k) {
-  return game.filter(function(output) {
-      return !!output[k];
-    }).map(function(output) { return output[k]})
+function loopbackConnection(connection) {
+  var looped = Rx.Observable.create(function(observer) {
+    connection.map(function(o) {
+      var copy = deepCopy(o);
+      if (copy.m == 'INPUT') {
+        copy.d.k = o.d.k == 'a' ? 'b' : 'a';
+      }
+      return copy;
+    })
+    .subscribe(observer);
+  }).share();
+
+  // suppress server-side output to looped connection
+
+  // drop input to the loopback
+  looped.onNext = function(output) { };
+
+  return looped;
 }
