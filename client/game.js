@@ -1,9 +1,9 @@
-var Rx = require('./rx/rx.js');
-require('./rx/rx.aggregates');
-require('./rx/rx.async');
-require('./rx/rx.binding');
-require('./rx/rx.coincidence');
-require('./rx/rx.time');
+var Rx = require('../common/rx/rx.js');
+require('../common/rx/rx.aggregates');
+require('../common/rx/rx.async');
+require('../common/rx/rx.binding');
+require('../common/rx/rx.coincidence');
+require('../common/rx/rx.time');
 
 var _ = require('../common/underscore');
 
@@ -173,7 +173,7 @@ function initGame(canvas){
     for (var t = state.t; t < input.t; t++) {
       state.collisions = Shots.tickCollisions(state.collisions);
 
-      playerList.forEach(k => {
+      playerList.forEach(k => { //shipTick
         var ship = state.ships[k];
         var keys = state.keys[k];
 
