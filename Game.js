@@ -3,7 +3,7 @@ var Rx = require('./common/rx/rx.binding');
 var deepCopy = require('./common/deepCopy');
 var ws = require('ws');
 
-function WebSocketConnection(ws) {
+function WebSocketConnection(wsc) {
   var connection = Rx.Observable.create(function(observer) {
     if (connection.isClosed) {
       // Immediately complete the stream if it's already closed
@@ -11,31 +11,31 @@ function WebSocketConnection(ws) {
       observer.onCompleted();
       return;
     }
-    ws.on('message', function(msg) {
+    wsc.on('message', function(msg) {
       observer.onNext(JSON.parse(msg));
     });
-    ws.on('error', function() {
+    wsc.on('error', function() {
       connection.isClosed = true;
       observer.onError();
     });
-    ws.on('close', function() {
+    wsc.on('close', function() {
       connection.isClosed = true;
       observer.onCompleted();
     });
 
     return function () {
       connection.isClosed = true;
-      ws.close();
+      wsc.close();
     };
   }).share(); // Keep one, single connection alive
 
   connection.onNext = function(message) {
-    ws.send(JSON.stringify(message));
+    wsc.send(JSON.stringify(message));
   };
 
   connection.onCompleted = connection.onError = function() {
     connection.isClosed = true;
-    ws.close();
+    wsc.close();
   };
 
   return connection;
@@ -74,7 +74,7 @@ exports.startServer = function (options) {
     var connectCount = 0;
     var playerA = mapPlayer('a', pair[0]);
     var playerB = mapPlayer('b', pair[1]);
-    
+
     var SYNC = {};
     var gotSync = {a: null, b:null};
     var game = Rx.Observable.returnValue(SYNC).concat(
@@ -106,8 +106,8 @@ exports.startServer = function (options) {
 
 function mapPlayer(k, connection) {
   var player = Rx.Observable.create(function(observer) {
-    connection.map(function(o) {
-      return {k: k, o:o};
+  connection.map(function(o) {
+    return {k: k, o:o};
     }).subscribe(observer);
   }).share();
 
@@ -135,8 +135,6 @@ function loopbackConnection(connection) {
   }).share();
 
   // suppress server-side output to looped connection
-
-  // drop input to the loopback
   looped.onNext = function(output) { };
   looped.onCompleted = looped.onError = connection.onCompleted.bind(connection);
 
