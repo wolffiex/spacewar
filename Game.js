@@ -90,19 +90,26 @@ exports.startServer = function (options) {
         }
       });
 
-    //game.subscribe(playerA);
-    //game.subscribe(playerB);
-
-    getPlayerFilter(game, 'a').subscribe(pair[0]);
-    getPlayerFilter(game, 'b').subscribe(pair[1]);
+    game.subscribe(playerA);
+    game.subscribe(playerB);
 
   });
 }
 
 function mapPlayer(k, connection) {
-  return connection.map(function(o) {
-    return {k: k, o:o};
-  });
+  var player = Rx.Observable.create(function(observer) {
+    connection.map(function(o) {
+      return {k: k, o:o};
+    }).subscribe(observer);
+  }).share();
+
+  player.onNext = function(output) {
+    if (output[k]) {
+      connection.onNext(output[k]);
+    }
+  }
+
+  return player;
 }
 
 function getPlayerFilter(game, k) {
