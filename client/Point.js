@@ -1,4 +1,4 @@
-var _ = require('./underscore');
+var _ = require('../common/underscore');
 
 var screenSize = {
   x: 800,

@@ -1,6 +1,6 @@
 var Point = require('./Point');
 var Ship = require('./Ship');
-var _ = require('./underscore');
+var _ = require('../common/underscore');
 
 var SHOTS = {
   max : 8,

@@ -1,4 +1,4 @@
-var _ = require('./underscore');
+var _ = require('../common/underscore');
 var Rx = require('./rx/rx');
 
 module.exports.getStream = (doc) => {

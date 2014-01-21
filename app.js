@@ -1,6 +1,7 @@
 var browserify = require('browserify-middleware');
 var express = require('express');
 var app = express();
+var _ = require('./common/underscore');
 
 browserify.settings('transform', ['es6ify']);
 
@@ -22,7 +23,19 @@ app.listen(3000);
 var ws = require('ws');
 var server = new ws.Server({port: 3001});
 
+var games = [{a: {}, b:{}}];
 server.on('connection', function(connection) {
+
+  var player;
+  var game = _.last(games);
+  if (game.b) {
+    player = 'a';
+    games.push({a: connection, b:null});
+  } else {
+    player = 'b';
+    // start game
+  }
+
   function send(message, data) {
     connection.send(JSON.stringify({m: message, d:data}));
   }
@@ -38,8 +51,8 @@ server.on('connection', function(connection) {
         break;
       case 'INPUT':
         o.d.l = false;
-        send('INPUT', o.d);
-        //setTimeout(function(){send('INPUT', o.d);}, 100);
+        //send('INPUT', o.d);
+        setTimeout(function(){send('INPUT', o.d);}, 100);
         break;
     }
   });

@@ -5,7 +5,7 @@ require('./rx/rx.binding');
 require('./rx/rx.coincidence');
 require('./rx/rx.time');
 
-var _ = require('./underscore');
+var _ = require('../common/underscore');
 
 var Ship = require('./Ship');
 var Point = require('./Point');
@@ -106,21 +106,20 @@ function initGame(canvas){
       shots: [],
     },
 
+    /*
     b: {
       pos: {x:100, y:100},
       spd: {x:0, y:0},
       rot: Math.PI,
       shots: [],
-    },
+    },*/
 
-    /*
     b: {
       pos: {x:300, y:300},
       spd: {x:0, y:0},
       rot: 0,
       shots: [],
     },
-    */
   });
 
   var initialState = Object.freeze({
