@@ -99,8 +99,6 @@ function initGame(canvas){
       // take the last state from the stateBuffer. It's possible
       // that the last entry on the stateBuffer is good, though
 
-      // Out of order input, need to fix up stateBuffer
-      // and reassign state
       var sbl = stateBuffer.length;
       var idx = sbl-1;
       while(stateBuffer[idx].t > input.t) {
@@ -111,7 +109,7 @@ function initGame(canvas){
       showNextTick = true;
 
       if (idx < sbl-1) {
-        //console.log('drop', stateBuffer, lastState.t, input.t, idx+1 - stateBuffer.length);
+        // Out of order input, need to fix up stateBuffer
         stateBuffer = stateBuffer.slice(0, idx+1);
       }
 
@@ -122,6 +120,10 @@ function initGame(canvas){
       //console.log(lastState, stateBuffer)
       throw 'whaa';
     }
+
+    // TODO: We should probably save state if a lot of time has passed beteween
+    // lastState and last(stateBuffer) It could be costly to rebuild state if
+    // we get an out of order update
 
     var state = lastState;
 
@@ -187,7 +189,6 @@ function initGame(canvas){
       if (stateBuffer.length > 30) {
         stateBuffer = stateBuffer.slice(15);
       }
-      
     }
 
     // Only spit out state for simulator times
@@ -233,7 +234,6 @@ function initGame(canvas){
     requestAnimationFrame(GameRenderer);
     _.defer(updateSimulation);
   };
-
 }
 
 global.initGame = initGame;
@@ -251,12 +251,13 @@ function send(message, data) {
 var otherInput = new Rx.Subject();
 socket.onmessage = function (event) {
   var o = JSON.parse(event.data);
-  //console.log(o);
+  //console.log('RECV', o.m, o.d);
   switch (o.m) {
-    case 'CONNECT':
-      send('CONNECT', Date.now());
+    case 'SYNC':
+      send('SYNC', Date.now());
       break;
     case 'START':
+      amA = o.d.k == 'a';
       var input = startGame(Date.now(), otherInput);
       input.subscribe(k => send('INPUT', k));
       break;
