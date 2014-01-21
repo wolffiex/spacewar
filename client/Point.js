@@ -1,17 +1,14 @@
 var _ = require('../common/underscore');
 
-var screenSize = {
-  x: 800,
-  y: 400, 
-};
+var Pt = (x,y) => ({x,y});
+var screenSize = Pt(800, 400);
 
 exports.screenSize = screenSize;
 
 exports.rotate = function(pt, r) {
-  return { 
-    x: pt.x * Math.cos(r) - pt.y * Math.sin(r),
-    y: pt.x * Math.sin(r) + pt.y * Math.cos(r),
-  };
+  return Pt(
+    pt.x * Math.cos(r) - pt.y * Math.sin(r),
+    pt.x * Math.sin(r) + pt.y * Math.cos(r));
 }
 
 exports.rotateX = function(pt, r) {
@@ -23,10 +20,7 @@ exports.rotateY = function(pt, r) {
 }
 
 exports.translate = function(pt, dxdy) {
-  return {
-    x: pt.x + dxdy.x,
-    y: pt.y + dxdy.y,
-  };
+  return Pt(pt.x + dxdy.x, pt.y + dxdy.y);
 }
 
 
@@ -35,9 +29,9 @@ exports.foldOnScreen = function(pt) {
   var foldedPt = null;
 
   if (pt.x < tolerance) {
-    foldedPt = {x: pt.x + screenSize.x, y: pt.y};
+    foldedPt = Pt(pt.x + screenSize.x, pt.y);
   } else if (pt.x > screenSize.x - tolerance) {
-    foldedPt = {x: pt.x - screenSize.x, y: pt.y};
+    foldedPt = Pt(pt.x - screenSize.x, pt.y);
   }
 
   if (pt.y < tolerance) {
@@ -50,5 +44,4 @@ exports.foldOnScreen = function(pt) {
 
   return foldedPt;
 }
-
-exports.data = (x,y) => {x,y};
+exports.Pt = Pt;

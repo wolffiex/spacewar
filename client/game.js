@@ -12,6 +12,8 @@ var Point = require('./Point');
 var Keys = require('./Keys');
 var Shots = require('./Shots');
 
+var Pt = Point.Pt;
+
 var GameRenderer = null;
 global.tGameStart = null;
 
@@ -33,7 +35,7 @@ function initGame(canvas){
   var ctx = canvas.getContext('2d');
 
   KeyInput = Keys.getStream(document).map(input => {
-    console.log(Date.now(), tGameStart)
+    //console.log(Date.now(), tGameStart)
     input.t = Date.now() - tGameStart;
     input.k = amA ? 'a' : 'b';
     return input;
@@ -90,8 +92,6 @@ function initGame(canvas){
   });
 
   var inputStream = replay.switch().merge(ordered);
-
-  inputStream.subscribe(x=>console.log(x));
 
   // When we push a time value onto the updater, it makes a new entry in the
   // keyBuffer for that time. This produces a new value for the ship
@@ -188,7 +188,6 @@ function initGame(canvas){
     }
 
     if (input.action == 'fire' && input.isDown) {
-      console.log('start fire')
       var ship = state.ships[input.k];
       ship.shots = Shots.startFire(ship, t);
     }
@@ -298,15 +297,15 @@ function getInitialState() {
   var collisions = [];
 
   var shipA = {
-    pos: {x:100, y:100},
-    spd: {x:0, y:0},
+    pos: Pt(100, 100),
+    spd: Pt(0, 0),
     rot: Math.PI,
     shots: [],
   };
 
   var shipB = {
-    pos: {x:200, y:200},
-    spd: {x:0, y:0},
+    pos: Pt(200, 200),
+    spd: Pt(0, 0),
     rot: 0,
     shots: [],
   };

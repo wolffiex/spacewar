@@ -1,11 +1,12 @@
 var Point = require('./Point');
 var _ = require('../common/underscore');
+var Pt = Point.Pt;
 
 var shipPoly = [
-  {x:   15, y: 0},
-  {x:  -15, y:  10},
-  {x:   -4, y:   0},
-  {x:  -15, y:  -10},
+  Pt( 15,  0),
+  Pt(-15, 10),
+  Pt( -4,  0),
+  Pt(-15,-10),
 ];
 
 
@@ -41,8 +42,8 @@ function _draw(ctx, pos, r) {
 }
 
 var rotSpeed = 0.003;
-var thrustAccel = {x: 0.0002, y: 0};
-var maxSpd = {x:0.4, y:0};
+var thrustAccel = Pt(0.0002, 0);
+var maxSpd = Pt(0.4, 0);
 var maxSpdHyp = maxSpd.x * maxSpd.x;
 
 // Mutates ship

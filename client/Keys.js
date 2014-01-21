@@ -34,5 +34,4 @@ exports.getStream = (doc) => {
       // duplicate key states when two keys are down, but this is harmless
       return val.action + (val.isDown ? '1' : '0');
     });
-
 }
