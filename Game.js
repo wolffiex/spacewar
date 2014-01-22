@@ -75,15 +75,11 @@ exports.startServer = function (options) {
     var playerA = mapPlayer('a', pair[0]);
     var playerB = mapPlayer('b', pair[1]);
 
-    var SYNC = {};
-    var gotSync = {a: null, b:null};
-    var game = Rx.Observable.returnValue(SYNC).concat(
-      playerA.merge(playerB)).map(function(d) {
-        if (d == SYNC) {
-          var msg = Msg('SYNC', Date.now());
-          return {a: msg, b:msg};
-        }
+    var syncMsg = Msg('SYNC', Date.now());
+    var SYNC = {a: syncMsg, b:syncMsg};
 
+    var gotSync = {a: null, b:null};
+    var game = playerA.merge(playerB).map(function(d) {
         var k = d.k
         var o = d.o;
         switch (o.m) {
@@ -96,8 +92,16 @@ exports.startServer = function (options) {
           case 'INPUT':
             return k == 'a' ? {b: o} : {a:o};
         }
-      });
+      }).shareValue(SYNC);
 
+    /*
+    game.subscribe(function(o) {
+      console.log('out1', o);
+    });
+    game.subscribe(function(o) {
+      console.log('out2', o);
+    });
+    */
     game.subscribe(playerA);
     game.subscribe(playerB);
 

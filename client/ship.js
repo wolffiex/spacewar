@@ -41,7 +41,7 @@ function _draw(ctx, pos, r) {
   ctx.fill();
 }
 
-var rotSpeed = 0.003;
+var rotSpeed = 0.001;
 var thrustAccel = Pt(0.0002, 0);
 var maxSpd = Pt(0.4, 0);
 var maxSpdHyp = maxSpd.x * maxSpd.x;
