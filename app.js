@@ -12,4 +12,8 @@ app.use(express.static('./static'));
 app.use('/js', browserify('./client'));
 
 app.listen(3000);
-Game.startServer({ port: 3001 });
+
+var log = Game.startServer({ port: 3001 });
+log.subscribe(function() {
+  console.log.apply(null, arguments);
+});

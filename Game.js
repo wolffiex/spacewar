@@ -1,7 +1,9 @@
 var Rx = require('./common/rx/rx');
 var Rx = require('./common/rx/rx.binding');
+var Rx = require('./common/rx/rx.aggregates');
 var deepCopy = require('./common/deepCopy');
 var ws = require('ws');
+var _ = require('./common/underscore');
 
 function WebSocketConnection(wsc) {
   var connection = Rx.Observable.create(function(observer) {
@@ -41,7 +43,9 @@ function WebSocketConnection(wsc) {
   return connection;
 };
 
-var Msg = function(msg, data){ return {m: msg, d: data} };
+var Msg = function(msg, data, player){
+  return {m: msg, d: data}
+};
 
 function WebSocketServer(options) {
   return Rx.Observable.create(function(observer) {
@@ -58,72 +62,42 @@ function WebSocketServer(options) {
 exports.startServer = function (options) {
   var server = WebSocketServer(options);
 
-  var lobby = server.subscribe(function(connection) {
-    connection.onNext(Msg('WAITING', Date.now()));
-  });
+  return server.bufferWithCount(2).flatMap(function(game) {
+    var a = game[0];
+    var b = game[1];
 
-  var loopback = false;
-  if (loopback) {
-    server = server.flatMap(function(connection) {
-      var looped = loopbackConnection(connection);
-      return Rx.Observable.fromArray([connection, looped]);
+    var syncMsg = Msg('SYNC', Date.now())
+    var sync = Rx.Observable.return([syncMsg, syncMsg]);
+
+    var preamble = sync.concat(
+      a.first().zip(b.first(), function(msgA, msgB) {
+        if (msgA.m != 'SYNC' || msgB.m != 'SYNC') throw "Preamble mismatch";
+
+        //console.log('t', msgA, msgA.d, msgB.d);
+
+        return [
+          Msg('START', {k: 'a', t:Date.now()}),
+          Msg('START', {k: 'b', t:Date.now()})];
+      }));
+    
+    var aOut = preamble.select(function(pair) {
+      console.log('got', pair, pair[0])
+      return pair[0];
+    }).concat(b);
+
+    var bOut = preamble.select(function(pair) {
+      return pair[1];
+    }).concat(a);
+
+    return Rx.Observable.fromArray([aOut, bOut]);
+
+  }).zip(server, function(conn, out) {
+    conn.subscribe(out);
+    return out.map(function(msg) { 
+      return ['LOG', msg];
     });
-  }
+  }).mergeAll();
 
-  server.bufferWithCount(2).subscribe(function (pair) {
-    var connectCount = 0;
-    var playerA = mapPlayer('a', pair[0]);
-    var playerB = mapPlayer('b', pair[1]);
-
-    var syncMsg = Msg('SYNC', Date.now());
-    var SYNC = {a: syncMsg, b:syncMsg};
-
-    var gotSync = {a: null, b:null};
-    var game = playerA.merge(playerB).map(function(d) {
-        var k = d.k
-        var o = d.o;
-        switch (o.m) {
-          case 'SYNC':
-            gotSync[k] = o.d;
-            return gotSync.a && gotSync.b ? {
-              a: Msg('START', {k: 'a', t: Date.now()}),
-              b: Msg('START', {k: 'b', t: Date.now()}),
-            } : {}
-          case 'INPUT':
-            return k == 'a' ? {b: o} : {a:o};
-        }
-      }).shareValue(SYNC);
-
-    /*
-    game.subscribe(function(o) {
-      console.log('out1', o);
-    });
-    game.subscribe(function(o) {
-      console.log('out2', o);
-    });
-    */
-    game.subscribe(playerA);
-    game.subscribe(playerB);
-
-  });
-}
-
-function mapPlayer(k, connection) {
-  var player = Rx.Observable.create(function(observer) {
-  connection.map(function(o) {
-    return {k: k, o:o};
-    }).subscribe(observer);
-  }).share();
-
-  player.onNext = function(output) {
-    if (output[k]) {
-      connection.onNext(output[k]);
-    }
-  }
-
-  player.onCompleted = player.onError = connection.onCompleted.bind(connection);
-
-  return player;
 }
 
 function loopbackConnection(connection) {
