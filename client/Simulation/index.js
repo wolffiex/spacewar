@@ -27,15 +27,14 @@ exports.update = (t) => {
   iniiii = false;
 }
 
+exports.getSimulation = inputStream => inputStream.merge(driver).map(simulate).filter(s => !!s);
+
 var stateBuffer = [initialState];
 // This is an optimization
 var lastState = deepCopy(initialState);
 var playerList = ['a', 'b'];
 var showNextTick = false;
-
-exports.getSimulation = inputStream => inputStream.merge(driver).map(simulate).filter(s => !!s);
-
-var simulate = input => {
+function simulate(input) {
   if (input.t > Date.now() - tGameStart) throw "Lost sync";
 
   if (lastState.t > input.t) {
@@ -77,42 +76,8 @@ var simulate = input => {
 
   for (var t = state.t; t < input.t; t++) {
     state.collisions = Shots.tickCollisions(state.collisions);
-
-    playerList.forEach(k => { //shipTick
-      var ship = state.ships[k];
-      var keys = state.keys[k];
-
-      var oShip = state.ships[k == 'a' ? 'b' : 'a'];
-
-      ship = Ship.inputTick(ship, keys);
-      ship.shots = Shots.tickShots(ship.shots);
-
-      if (keys.fire) {
-        ship.shots = Shots.repeatFire(ship);
-      }
-      state.ships[k] = ship;
-
-      var newCollisions = Ship.checkShots(oShip, ship.shots);
-
-      if (newCollisions.length) {
-        // this mutates shipA.shots
-        var shots = ship.shots;
-
-        _.each(newCollisions, function(shotIndex) {
-          //
-          var collision = shots[shotIndex];
-          shots[shotIndex] = null;
-          collision.age = 0;
-          collision.spd.x /= 2;
-          collision.spd.y /= 2;
-
-          state.collisions = state.collisions.concat(collision);
-        });
-
-        ship.shots = _.compact(shots);
-      }
-    });
-
+    state = doPlayerTick('a', state);
+    state = doPlayerTick('b', state);
   }
 
   if (input.action == 'fire' && input.isDown) {
@@ -137,4 +102,40 @@ var simulate = input => {
 
   // Only spit out state for driver times
   return isNewInput ? null : state;
+}
+
+function doPlayerTick(k, state) {
+  var ship = state.ships[k];
+  var keys = state.keys[k];
+
+  var oShip = state.ships[k == 'a' ? 'b' : 'a'];
+
+  ship = Ship.inputTick(ship, keys);
+  ship.shots = Shots.tickShots(ship.shots);
+
+  if (keys.fire) {
+    ship.shots = Shots.repeatFire(ship);
+  }
+  state.ships[k] = ship;
+
+  var newCollisions = Ship.checkShots(oShip, ship.shots);
+
+  if (newCollisions.length) {
+    // this mutates shipA.shots
+    var shots = ship.shots;
+
+    _.each(newCollisions, function(shotIndex) {
+      //
+      var collision = shots[shotIndex];
+      shots[shotIndex] = null;
+      collision.age = 0;
+      collision.spd.x /= 2;
+      collision.spd.y /= 2;
+
+      state.collisions = state.collisions.concat(collision);
+    });
+
+    ship.shots = _.compact(shots);
+  }
+  return state;
 }
