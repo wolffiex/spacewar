@@ -6,30 +6,28 @@ require('../common/rx/rx.coincidence');
 require('../common/rx/rx.time');
 
 var _ = require('../common/underscore');
-var deepCopy = require('../common/deepCopy');
 
 var Ship = require('./Ship');
 var Point = require('./Point');
 var Keys = require('./Keys');
 var Shots = require('./Shots');
+var Simulation = require('./Simulation');
 
 var Pt = Point.Pt;
 
 var GameRenderer = null;
 global.tGameStart = null;
 
-function startGame(t, otherInput) {
+function startGame(t) {
   if (!GameRenderer) throw "Game didn't init"
   tGameStart = t;
 
-  otherInput.subscribe(OtherInput);
   requestAnimationFrame(GameRenderer);
   return KeyInput;
-
 }
 
 var KeyInput = null;
-var OtherInput = null;
+var OtherInput = new Rx.Subject();
 var amA = true;
 
 function initGame(canvas){
@@ -75,139 +73,21 @@ function initGame(canvas){
       Rx.Observable.returnValue(input);
   });
 
-  // When we push a time value onto the updater, it makes a new entry in the
-  // keyBuffer for that time. This produces a new value for the ship
-  // position
-  var simulator = new Rx.Subject();
-  var carrier = {t:null};
-  function updateSimulation() {
-    carrier.t = Date.now() - tGameStart;
-    simulator.onNext(carrier);
+  var simulation = Simulation.getSimulation(inputStream);
+
+  var updateSimulation = function() {
+    Simulation.update(Date.now() - tGameStart);
   }
 
-
-  var initialState = Object.freeze(getInitialState()); 
-
-  var stateBuffer = [initialState];
-  // This is an optimization
-  var lastState = deepCopy(initialState);
-  var playerList = ['a', 'b'];
-  var showNextTick = false;
-  var loop = inputStream.merge(simulator).map(input => {
-
-    if (input.t > Date.now() - tGameStart) throw "Lost sync";
-
-    if (lastState.t > input.t) {
-      // At the very least, lastState is out of date, so we will
-      // take the last state from the stateBuffer. It's possible
-      // that the last entry on the stateBuffer is good, though
-
-      var sbl = stateBuffer.length;
-      var idx = sbl-1;
-      while(stateBuffer[idx].t > input.t) {
-        if (idx ==0) throw "Fell too far behind";
-        idx--;
-      }
-
-      showNextTick = true;
-
-      if (idx < sbl-1) {
-        // Out of order input, need to fix up stateBuffer
-        stateBuffer = stateBuffer.slice(0, idx+1);
-      }
-
-      lastState = deepCopy(_.last(stateBuffer));
-    }
-
-    if (lastState.t > _.last(stateBuffer.t)) {
-      //console.log(lastState, stateBuffer)
-      throw 'whaa';
-    }
-
-    // TODO: We should probably save state if a lot of time has passed beteween
-    // lastState and last(stateBuffer) It could be costly to rebuild state if
-    // we get an out of order update
-
-    var state = lastState;
-
-    var isNewInput = !!input.action;
-    var shipA = state.ships.a;
-    var shipB = state.ships.b;
-
-    for (var t = state.t; t < input.t; t++) {
-      state.collisions = Shots.tickCollisions(state.collisions);
-
-      playerList.forEach(k => { //shipTick
-        var ship = state.ships[k];
-        var keys = state.keys[k];
-
-        var oShip = state.ships[k == 'a' ? 'b' : 'a'];
-
-        ship = Ship.inputTick(ship, keys);
-        ship.shots = Shots.tickShots(ship.shots);
-
-        if (keys.fire) {
-          ship.shots = Shots.repeatFire(ship);
-        }
-        state.ships[k] = ship;
-
-        var newCollisions = Ship.checkShots(oShip, ship.shots);
-
-        if (newCollisions.length) {
-          // this mutates shipA.shots
-          var shots = ship.shots;
-
-          _.each(newCollisions, function(shotIndex) {
-            //
-            var collision = shots[shotIndex];
-            shots[shotIndex] = null;
-            collision.age = 0;
-            collision.spd.x /= 2;
-            collision.spd.y /= 2;
-
-            state.collisions = state.collisions.concat(collision);
-          });
-
-          ship.shots = _.compact(shots);
-        }
-      });
-
-    }
-
-    if (input.action == 'fire' && input.isDown) {
-      var ship = state.ships[input.k];
-      ship.shots = Shots.startFire(ship, t);
-    }
-
-    state.t = input.t;
-    // not necessary since these functions are mutative, but
-    // it would be nice if they didn't have to be
-    state.ships.a = shipA;
-    state.ships.b = shipB;
-    if (isNewInput) {
-      var keys = state.keys[input.k];
-      keys[input.action] = input.isDown;
-      // save a copy of state in case we need to rewind
-      stateBuffer.push(Object.freeze(deepCopy(state)));
-      if (stateBuffer.length > 30) {
-        stateBuffer = stateBuffer.slice(15);
-      }
-    }
-
-    // Only spit out state for simulator times
-    // This doesn't matter much here, but it could if
-    // the simulator were driving the renderer
-    return isNewInput ? null : state;
-  }).filter(s => !!s);
-  
   var renderInfo = {
-    ships : initialState.ships,
+    ships : Simulation.initialShips,
     collisions : [],
   };
 
   // This is optimized not to create an object
-  loop.subscribe(state => {
+  simulation.subscribe(state => {
     if (state) {
+      if (!state.ships) console.log('re', state)
       renderInfo.ships = state.ships;
       renderInfo.collisions = state.collisions;
     }
@@ -251,7 +131,6 @@ function send(message, data) {
 }
 
 
-var otherInput = new Rx.Subject();
 
 var pingTime;
 var waitTime = 1000;
@@ -280,44 +159,17 @@ socket.onmessage = function (event) {
     case 'GO':
       go(o.d);
     case 'INPUT':
-      otherInput.onNext(o.d);
+      OtherInput.onNext(o.d);
       break;
   }
 }
 
+var gone = false;
 function go(startTime) {
-  console.log('start', startTime, Date.now())
-  var input = startGame(Date.now(), otherInput);
+  if (gone) return;
+  gone = true;
+  var input = startGame(Date.now());
   input.subscribe(k => send('INPUT', k));
 }
 
 
-function getInitialState() {
-  var t = 0;
-
-  var initialKeys = _.reduce(Keys.actions, (o, action) =>{
-    o[action] = false;
-    return o;
-  }, {});
-
-  var keys = {a: initialKeys, b: initialKeys};
-  var collisions = [];
-
-  var shipA = {
-    pos: Pt(100, 100),
-    spd: Pt(0, 0),
-    rot: Math.PI,
-    shots: [],
-  };
-
-  var shipB = {
-    pos: Pt(200, 200),
-    spd: Pt(0, 0),
-    rot: 0,
-    shots: [],
-  };
-
-  var ships = {a: shipA, b: shipB}
-
-  return {t, keys, collisions, ships};
-}

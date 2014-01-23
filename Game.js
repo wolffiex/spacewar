@@ -68,7 +68,7 @@ exports.startServer = function (options) {
   var server = WebSocketServer(options);
 
   // loopback behavior
-  if (false) {
+  if (true) {
     server = server.flatMap(function(connection) {
       return Rx.Observable.fromArray([connection, loopback(connection)]);
     });
