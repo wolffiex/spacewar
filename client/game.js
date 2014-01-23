@@ -36,7 +36,6 @@ function initGame(canvas){
   var ctx = canvas.getContext('2d');
 
   KeyInput = Keys.getStream(document).map(input => {
-    //console.log(Date.now(), tGameStart)
     input.t = Date.now() - tGameStart;
     input.k = amA ? 'a' : 'b';
     return input;
@@ -95,6 +94,9 @@ function initGame(canvas){
   var playerList = ['a', 'b'];
   var showNextTick = false;
   var loop = inputStream.merge(simulator).map(input => {
+
+    if (input.t > Date.now() - tGameStart) throw "Lost sync";
+
     if (lastState.t > input.t) {
       // At the very least, lastState is out of date, so we will
       // take the last state from the stateBuffer. It's possible
@@ -250,24 +252,45 @@ function send(message, data) {
 
 
 var otherInput = new Rx.Subject();
+
+var pingTime;
+var waitTime = 1000;
 socket.onmessage = function (event) {
   var o = JSON.parse(event.data);
   //console.log('RECV', o.m, o.d);
   switch (o.m) {
-    case 'SYNC':
-      send('SYNC', Date.now());
-      break;
     case 'START':
-      amA = o.d.k == 'a';
-      var input = startGame(Date.now(), otherInput);
-      input.subscribe(k => send('INPUT', k));
+      var k = o.d.k; 
+      amA = k == 'a';
+      if (amA) _.delay(() =>{
+        pingTime = Date.now();
+        send('PING', null);
+      }, 100);
       break;
+    case 'PING':
+      send('PONG', Date.now());
+      break;
+    case 'PONG':
+      var pongTime = Date.now();
+      var latency = pongTime - pingTime;
+      var otherTime = o.d;
+      send('GO', otherTime + latency/2 + waitTime);
+      go(pongTime + waitTime);
+      break;
+    case 'GO':
+      go(o.d);
     case 'INPUT':
-      //console.log('input', o.d)
       otherInput.onNext(o.d);
       break;
   }
 }
+
+function go(startTime) {
+  console.log('start', startTime, Date.now())
+  var input = startGame(Date.now(), otherInput);
+  input.subscribe(k => send('INPUT', k));
+}
+
 
 function getInitialState() {
   var t = 0;
