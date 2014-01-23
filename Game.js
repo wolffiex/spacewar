@@ -67,16 +67,23 @@ function assert(x) {if (!x) throw "Assertion failed"};
 exports.startServer = function (options) {
   var server = WebSocketServer(options);
 
+  // loopback behavior
+  if (false) {
+    server = server.flatMap(function(connection) {
+      return Rx.Observable.fromArray([connection, loopback(connection)]);
+    });
+  }
+
   var gameNum = 0;
   return server.bufferWithCount(2).map(function(game) {
     var a = game[0];
     var b = game[1];
 
     var now = Date.now();
-    Rx.Observable.return(Msg('START', {k:'a', now: now}))
+    Rx.Observable.return(Msg('START', {k:'a', t: now}))
       .merge(b).subscribe(a);
 
-    Rx.Observable.return(Msg('START', {k:'b', now: now}))
+    Rx.Observable.return(Msg('START', {k:'b', t: now}))
       .merge(a).subscribe(b);
 
     // Return an Observable which is the log of the game
@@ -84,7 +91,7 @@ exports.startServer = function (options) {
   }).mergeAll();
 }
 
-function loopbackConnection(connection) {
+function loopback(connection) {
   var looped = Rx.Observable.create(function(observer) {
     connection.map(function(o) {
       var copy = deepCopy(o);
@@ -93,6 +100,7 @@ function loopbackConnection(connection) {
       }
       return copy;
     })
+    //.delay(200)
     .subscribe(observer);
   }).share();
 
