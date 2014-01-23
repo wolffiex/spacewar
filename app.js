@@ -14,6 +14,6 @@ app.use('/js', browserify('./client'));
 app.listen(3000);
 
 var log = Game.startServer({ port: 3001 });
-log.subscribe(function() {
-  console.log.apply(null, arguments);
+log.subscribe(function(line) {
+  console.log(line);
 });

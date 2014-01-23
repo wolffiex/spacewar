@@ -1,6 +1,8 @@
 var Rx = require('./common/rx/rx');
 var Rx = require('./common/rx/rx.binding');
 var Rx = require('./common/rx/rx.aggregates');
+var Rx = require('./common/rx/rx.time');
+
 var deepCopy = require('./common/deepCopy');
 var ws = require('ws');
 var _ = require('./common/underscore');
@@ -59,45 +61,27 @@ function WebSocketServer(options) {
   }).select(WebSocketConnection).share();
 }
 
+function notNull(x) {return x != null;}
+function assert(x) {if (!x) throw "Assertion failed"};
+
 exports.startServer = function (options) {
   var server = WebSocketServer(options);
 
-  return server.bufferWithCount(2).flatMap(function(game) {
+  var gameNum = 0;
+  return server.bufferWithCount(2).map(function(game) {
     var a = game[0];
     var b = game[1];
 
-    var syncMsg = Msg('SYNC', Date.now())
-    var sync = Rx.Observable.return([syncMsg, syncMsg]);
+    var now = Date.now();
+    Rx.Observable.return(Msg('START', {k:'a', now: now}))
+      .merge(b).subscribe(a);
 
-    var preamble = sync.concat(
-      a.first().zip(b.first(), function(msgA, msgB) {
-        if (msgA.m != 'SYNC' || msgB.m != 'SYNC') throw "Preamble mismatch";
+    Rx.Observable.return(Msg('START', {k:'b', now: now}))
+      .merge(a).subscribe(b);
 
-        //console.log('t', msgA, msgA.d, msgB.d);
-
-        return [
-          Msg('START', {k: 'a', t:Date.now()}),
-          Msg('START', {k: 'b', t:Date.now()})];
-      }));
-    
-    var aOut = preamble.select(function(pair) {
-      console.log('got', pair, pair[0])
-      return pair[0];
-    }).concat(b);
-
-    var bOut = preamble.select(function(pair) {
-      return pair[1];
-    }).concat(a);
-
-    return Rx.Observable.fromArray([aOut, bOut]);
-
-  }).zip(server, function(conn, out) {
-    conn.subscribe(out);
-    return out.map(function(msg) { 
-      return ['LOG', msg];
-    });
+    // Return an Observable which is the log of the game
+    return Rx.Observable.return("Game " + gameNum++);
   }).mergeAll();
-
 }
 
 function loopbackConnection(connection) {
