@@ -94,12 +94,14 @@ exports.startServer = function (options) {
 function loopback(connection) {
   var looped = Rx.Observable.create(function(observer) {
     connection.map(function(o) {
+      // Don't allow game to start twice
+      if (o.m == 'GO') return null;
       var copy = deepCopy(o);
       if (copy.m == 'INPUT') {
         copy.d.k = o.d.k == 'a' ? 'b' : 'a';
       }
       return copy;
-    })
+    }).filter(notNull)
     //.delay(200)
     .subscribe(observer);
   }).share();

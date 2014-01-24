@@ -24,19 +24,17 @@ exports.initialShips = initialState.ships;
 exports.update = (t) => {
   carrier.t = t;
   driver.onNext(carrier);
-  iniiii = false;
 }
 
-exports.getSimulation = inputStream => inputStream.merge(driver).map(simulate).filter(s => !!s);
+exports.getSimulation = inputStream => 
+  inputStream.merge(driver).map(simulate).filter(s => !!s);
 
 var stateBuffer = [initialState];
 // This is an optimization
 var lastState = deepCopy(initialState);
-var playerList = ['a', 'b'];
 var showNextTick = false;
-function simulate(input) {
-  if (input.t > Date.now() - tGameStart) throw "Lost sync";
 
+function simulate(input) {
   if (lastState.t > input.t) {
     // At the very least, lastState is out of date, so we will
     // take the last state from the stateBuffer. It's possible

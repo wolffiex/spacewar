@@ -87,7 +87,6 @@ function initGame(canvas){
   // This is optimized not to create an object
   simulation.subscribe(state => {
     if (state) {
-      if (!state.ships) console.log('re', state)
       renderInfo.ships = state.ships;
       renderInfo.collisions = state.collisions;
     }
@@ -130,8 +129,6 @@ function send(message, data) {
   socket.send(JSON.stringify({m: message, d:data}));
 }
 
-
-
 var pingTime;
 var waitTime = 1000;
 socket.onmessage = function (event) {
@@ -153,21 +150,21 @@ socket.onmessage = function (event) {
       var pongTime = Date.now();
       var latency = pongTime - pingTime;
       var otherTime = o.d;
-      send('GO', otherTime + latency/2 + waitTime);
+      send('GO', Math.round(otherTime + latency/2 + waitTime));
       go(pongTime + waitTime);
       break;
     case 'GO':
       go(o.d);
+      break;
     case 'INPUT':
-      OtherInput.onNext(o.d);
+      var d = o.d;
+      if (d.t > Date.now() - tGameStart) throw "Lost sync";
+      OtherInput.onNext(d);
       break;
   }
 }
 
-var gone = false;
 function go(startTime) {
-  if (gone) return;
-  gone = true;
   var input = startGame(Date.now());
   input.subscribe(k => send('INPUT', k));
 }
