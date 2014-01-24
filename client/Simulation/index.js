@@ -36,8 +36,6 @@ function simulate(input) {
   state = stateBuffer.getBefore(input.t);
 
   var isNewInput = !!input.action;
-  var shipA = state.ships.a;
-  var shipB = state.ships.b;
 
   for (var t = state.t; t < input.t; t++) {
     state.collisions = Shots.tickCollisions(state.collisions);
@@ -51,19 +49,12 @@ function simulate(input) {
   }
 
   state.t = input.t;
-  // not necessary since these functions are mutative, but
-  // it would be nice if they didn't have to be
-  state.ships.a = shipA;
-  state.ships.b = shipB;
   if (isNewInput) {
     var keys = state.keys[input.k];
     keys[input.action] = input.isDown;
-    stateBuffer.save(state);
   }
 
-  // TODO: We should also probably save state if a lot of time has passed
-  // beteween state and last(stateBuffer) since it could be costly to rebuild
-  // state if we get an out of order update
+  stateBuffer.save(state, isNewInput);
 
   // Only spit out state for driver times
   return isNewInput ? null : state;

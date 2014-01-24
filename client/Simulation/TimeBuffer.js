@@ -31,11 +31,19 @@ class TimeBuffer {
     return this._last;
   }
 
-  save(o) {
-    // save a copy of state in case we need to rewind
-    this._buffer.push(Object.freeze(deepCopy(o)));
-    if (this._buffer.length > 30) {
-      this._buffer = this._buffer.slice(15);
+  save(o, preserve) {
+    this._last = o;
+
+    // TODO: We should also probably save state if a lot of time has passed
+    // beteween state and last(stateBuffer) since it could be costly to rebuild
+    // state if we get an out of order update, but for now we only preserver
+    // states the caller explicitly flags
+    if (preserve) {
+      // save a copy of state in case we need to rewind
+      this._buffer.push(Object.freeze(deepCopy(o)));
+      if (this._buffer.length > 30) {
+        this._buffer = this._buffer.slice(15);
+      }
     }
   }
 }
