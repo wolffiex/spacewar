@@ -1,0 +1,43 @@
+var deepCopy = require('../../common/deepCopy');
+var _ = require('../../common/underscore');
+class TimeBuffer {
+
+  constructor (initial) {
+    this._buffer = [Object.freeze(initial)];
+    this._last = deepCopy(initial);
+  }
+
+  getBefore(t) {
+    if (this._last.t > t) {
+      // At the very least, this._last is out of date, so we will
+      // take the last state from the stateBuffer. It's possible
+      // that the last entry on the stateBuffer is good, though
+
+      var sbl = this._buffer.length;
+      var idx = sbl-1;
+      while(this._buffer[idx].t > t) {
+        if (idx ==0) throw "Fell too far behind";
+        idx--;
+      }
+
+      if (idx < sbl-1) {
+        // Out of order input, need to fix up this._buffer
+        this._buffer = this._buffer.slice(0, idx+1);
+      }
+
+      this._last = deepCopy(_.last(this._buffer));
+    }
+
+    return this._last;
+  }
+
+  save(o) {
+    // save a copy of state in case we need to rewind
+    this._buffer.push(Object.freeze(deepCopy(o)));
+    if (this._buffer.length > 30) {
+      this._buffer = this._buffer.slice(15);
+    }
+  }
+}
+
+module.exports = TimeBuffer;

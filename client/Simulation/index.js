@@ -12,6 +12,7 @@ var _ = require('../../common/underscore');
 var deepCopy = require('../../common/deepCopy');
 
 var initialState = require('./initialState');
+var TimeBuffer = require('./TimeBuffer');
 
 // When we push a time value onto the updater, it makes a new entry in the
 // keyBuffer for that time. This produces a new value for the ship
@@ -29,44 +30,10 @@ exports.update = (t) => {
 exports.getSimulation = inputStream => 
   inputStream.merge(driver).map(simulate).filter(s => !!s);
 
-var stateBuffer = [initialState];
-// This is an optimization
-var lastState = deepCopy(initialState);
-var showNextTick = false;
+var stateBuffer = new TimeBuffer(initialState);
 
 function simulate(input) {
-  if (lastState.t > input.t) {
-    // At the very least, lastState is out of date, so we will
-    // take the last state from the stateBuffer. It's possible
-    // that the last entry on the stateBuffer is good, though
-
-    var sbl = stateBuffer.length;
-    var idx = sbl-1;
-    while(stateBuffer[idx].t > input.t) {
-      if (idx ==0) throw "Fell too far behind";
-      idx--;
-    }
-
-    showNextTick = true;
-
-    if (idx < sbl-1) {
-      // Out of order input, need to fix up stateBuffer
-      stateBuffer = stateBuffer.slice(0, idx+1);
-    }
-
-    lastState = deepCopy(_.last(stateBuffer));
-  }
-
-  if (lastState.t > _.last(stateBuffer.t)) {
-    //console.log(lastState, stateBuffer)
-    throw 'whaa';
-  }
-
-  // TODO: We should probably save state if a lot of time has passed beteween
-  // lastState and last(stateBuffer) It could be costly to rebuild state if
-  // we get an out of order update
-
-  var state = lastState;
+  state = stateBuffer.getBefore(input.t);
 
   var isNewInput = !!input.action;
   var shipA = state.ships.a;
@@ -91,12 +58,12 @@ function simulate(input) {
   if (isNewInput) {
     var keys = state.keys[input.k];
     keys[input.action] = input.isDown;
-    // save a copy of state in case we need to rewind
-    stateBuffer.push(Object.freeze(deepCopy(state)));
-    if (stateBuffer.length > 30) {
-      stateBuffer = stateBuffer.slice(15);
-    }
+    stateBuffer.save(state);
   }
+
+  // TODO: We should also probably save state if a lot of time has passed
+  // beteween state and last(stateBuffer) since it could be costly to rebuild
+  // state if we get an out of order update
 
   // Only spit out state for driver times
   return isNewInput ? null : state;
