@@ -72,7 +72,6 @@ function doPlayerTick(k, state) {
   if (keys.fire) {
     ship.shots = Shots.repeatFire(ship);
   }
-  state.ships[k] = ship;
 
   var newCollisions = Ship.checkShots(oShip, ship.shots);
 
@@ -81,7 +80,6 @@ function doPlayerTick(k, state) {
     var shots = ship.shots;
 
     _.each(newCollisions, function(shotIndex) {
-      //
       var collision = shots[shotIndex];
       shots[shotIndex] = null;
       collision.age = 0;
@@ -93,5 +91,7 @@ function doPlayerTick(k, state) {
 
     ship.shots = _.compact(shots);
   }
+
+  state.ships[k] = ship;
   return state;
 }

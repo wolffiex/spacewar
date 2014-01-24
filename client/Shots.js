@@ -48,17 +48,12 @@ function tryFire(ship) {
   var shots = ship.shots;
   if (shots.length < SHOTS.max) {
     var r = ship.rot;
-    shots.push({
-      age: 0,
-      pos : {
-        x : ship.pos.x + Point.rotateX(Ship.nose, r),
-        y : ship.pos.y + Point.rotateY(Ship.nose, r),
-      },
-      spd : {
-        x : ship.spd.x + Point.rotateX(SHOTS.accel, r),
-        y : ship.spd.y + Point.rotateY(SHOTS.accel, r),
-      },
-    });
+    var shot = {
+      age : 0,
+      pos : Point.translate(ship.pos, Point.rotate(Ship.nose, r)),
+      spd : Point.translate(ship.spd, Point.rotate(SHOTS.accel, r)),
+    };
+    shots.push(shot);
   }
 
   return shots;
