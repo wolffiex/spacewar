@@ -1,15 +1,9 @@
-var Rx = require('../../common/rx/rx.js');
-require('../../common/rx/rx.aggregates');
-require('../../common/rx/rx.async');
-require('../../common/rx/rx.binding');
-require('../../common/rx/rx.coincidence');
-require('../../common/rx/rx.time');
-
+var Rx = require('Rx');
+var _ = require('underscore');
+var deepCopy = require('deepCopy');
 
 var Ship = require('../Ship');
 var Shots = require('../Shots');
-var _ = require('../../common/underscore');
-var deepCopy = require('../../common/deepCopy');
 
 var initialState = require('./initialState');
 var TimeBuffer = require('./TimeBuffer');

@@ -1,11 +1,5 @@
-var Rx = require('../common/rx/rx.js');
-require('../common/rx/rx.aggregates');
-require('../common/rx/rx.async');
-require('../common/rx/rx.binding');
-require('../common/rx/rx.coincidence');
-require('../common/rx/rx.time');
-
-var _ = require('../common/underscore');
+var Rx = require('Rx');
+var _ = require('underscore');
 
 var Ship = require('./Ship');
 var Point = require('./Point');

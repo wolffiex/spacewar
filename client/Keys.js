@@ -1,5 +1,5 @@
-var _ = require('../common/underscore');
-var Rx = require('../common/rx/rx');
+var _ = require('underscore');
+var Rx = require('Rx');
 
 var KEY_CODES = {
   37: 'left',

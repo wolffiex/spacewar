@@ -1,5 +1,5 @@
 var Point = require('./Point');
-var _ = require('../common/underscore');
+var _ = require('underscore');
 var Pt = Point.Pt;
 
 var shipPoly = [

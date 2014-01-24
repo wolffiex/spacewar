@@ -1,6 +1,6 @@
 var Point = require('./Point');
 var Ship = require('./Ship');
-var _ = require('../common/underscore');
+var _ = require('underscore');
 var Pt = Point.Pt;
 
 var SHOTS = {

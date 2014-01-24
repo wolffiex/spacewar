@@ -1,11 +1,8 @@
-var Rx = require('./common/rx/rx');
-var Rx = require('./common/rx/rx.binding');
-var Rx = require('./common/rx/rx.aggregates');
-var Rx = require('./common/rx/rx.time');
+var Rx = require('Rx');
 
-var deepCopy = require('./common/deepCopy');
+var deepCopy = require('deepCopy');
 var ws = require('ws');
-var _ = require('./common/underscore');
+var _ = require('underscore');
 
 function WebSocketConnection(wsc) {
   var connection = Rx.Observable.create(function(observer) {
@@ -102,7 +99,7 @@ function loopback(connection) {
       }
       return copy;
     }).filter(notNull)
-    //.delay(200)
+    .delay(200)
     .subscribe(observer);
   }).share();
 

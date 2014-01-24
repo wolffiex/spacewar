@@ -1,5 +1,6 @@
-var deepCopy = require('../../common/deepCopy');
-var _ = require('../../common/underscore');
+var deepCopy = require('deepCopy');
+var _ = require('underscore');
+
 class TimeBuffer {
 
   constructor (initial) {

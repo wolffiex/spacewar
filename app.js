@@ -1,9 +1,9 @@
 var browserify = require('browserify-middleware');
 var express = require('express');
 var app = express();
-var _ = require('./common/underscore');
+var _ = require('underscore');
 
-var Rx = require('./common/rx/rx');
+var Rx = require('Rx');
 var Game = require('./Game');
 
 browserify.settings('transform', ['es6ify']);

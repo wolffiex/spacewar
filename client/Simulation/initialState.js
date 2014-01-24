@@ -1,6 +1,6 @@
 var Keys = require('../Keys');
 var Pt = require('../Point').Pt;
-var _ = require('../../common/underscore');
+var _ = require('underscore');
 
 var t = 0;
 
