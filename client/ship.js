@@ -43,8 +43,6 @@ function _draw(ctx, pos, r) {
 
 var rotSpeed = 0.001;
 var thrustAccel = Pt(0.0002, 0);
-var maxSpd = Pt(0.4, 0);
-var maxSpdHyp = maxSpd.x * maxSpd.x;
 
 // Mutates ship
 exports.inputTick = function(ship, keys) {
@@ -52,46 +50,54 @@ exports.inputTick = function(ship, keys) {
   if (keys.right) ship.rot += rotSpeed;
 
   var pos = ship.pos;
-  pos.x += ship.spd.x;
-  pos.y += ship.spd.y;
+  var spd = ship.spd;
+  pos.x += spd.x;
+  pos.y += spd.y;
 
   if (keys.thrust) {
-    var spdX = ship.spd.x;
-    var spdY = ship.spd.y;
-    spdX += Point.rotateX(thrustAccel, ship.rot);
-    spdY += Point.rotateY(thrustAccel, ship.rot);
-
-    // Limit speed by scaling the speed vector if
-    // necessary
-    if (spdX*spdX + spdY*spdY > maxSpdHyp) {
-      var theta = Math.atan(spdY/spdX);
-
-      var newSpdX = Point.rotateX(maxSpd, theta);
-      var newSpdY = Point.rotateY(maxSpd, theta);
-
-      if (spdX * newSpdX < 0 ) {
-        newSpdX *= -1;
-      }
-
-      if (spdY * newSpdY < 0 ) {
-        newSpdY *= -1;
-      }
-
-      spdX = newSpdX;
-      spdY = newSpdY;
-    }
-
-    ship.spd.x = spdX;
-    ship.spd.y = spdY;
+    spd.x += Point.rotateX(thrustAccel, ship.rot);
+    spd.y += Point.rotateY(thrustAccel, ship.rot);
+    ship.spd = limitSpeed(spd);
   }
+
 
   if (pos.x < 0) pos.x += Point.screenSize.x;
   if (pos.x > Point.screenSize.x) pos.x -= Point.screenSize.x;
   if (pos.y < 0) pos.y += Point.screenSize.y;
   if (pos.y > Point.screenSize.y) pos.y -= Point.screenSize.y;
+
   return ship;
 }
 
+var maxSpd = Pt(0.4, 0);
+var maxSpdHyp = maxSpd.x * maxSpd.x;
+function limitSpeed(spd) {
+  var spdX = spd.x;
+  var spdY = spd.y;
+
+  // Limit speed by scaling the speed vector if
+  // necessary
+  if (spdX*spdX + spdY*spdY > maxSpdHyp) {
+    var theta = Math.atan(spdY/spdX);
+
+    var newSpdX = Point.rotateX(maxSpd, theta);
+    var newSpdY = Point.rotateY(maxSpd, theta);
+
+    if (spdX * newSpdX < 0 ) {
+      newSpdX *= -1;
+    }
+
+    if (spdY * newSpdY < 0 ) {
+      newSpdY *= -1;
+    }
+
+    return Pt(newSpdX, newSpdY);
+  } else {
+    return spd;
+  }
+}
+
+exports.limitSpeed = limitSpeed;
 exports.nose = shipPoly[0];
 exports.draw = draw;
 

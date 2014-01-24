@@ -73,12 +73,18 @@ function doPlayerTick(k, state) {
     // this mutates shipA.shots
     var shots = ship.shots;
 
+    // shots also affect speed of ship that was hit
     _.each(newCollisions, function(shotIndex) {
       var collision = shots[shotIndex];
       shots[shotIndex] = null;
+      oShip.spd.x += collision.spd.x/8;
+      oShip.spd.y += collision.spd.y/8;
+
+      oShip.spd = Ship.limitSpeed(oShip.spd);
+
       collision.age = 0;
-      collision.spd.x /= 2;
-      collision.spd.y /= 2;
+      collision.spd.x = oShip.spd.x;
+      collision.spd.y = oShip.spd.y;
 
       state.collisions = state.collisions.concat(collision);
     });
