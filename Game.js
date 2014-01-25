@@ -1,5 +1,6 @@
 var Rx = require('Rx');
 
+var RxWebSocketServer = require('RxWS').RxWebSocketServer;
 var utils = require('utils');
 var ws = require('ws');
 var _ = require('underscore');
@@ -8,58 +9,8 @@ var Msg = function(msg, data, player){
   return {m: msg, d: data}
 };
 
-function WebSocketConnection(wsc) {
-  var connection = Rx.Observable.create(function(observer) {
-    if (connection.isClosed) {
-      // Immediately complete the stream if it's already closed
-      // TODO: Schedule this appropriately
-      observer.onCompleted();
-      return;
-    }
-    wsc.on('message', function(msg) {
-      observer.onNext(JSON.parse(msg));
-    });
-    wsc.on('error', function() {
-      connection.isClosed = true;
-      observer.onError();
-    });
-    wsc.on('close', function() {
-      connection.isClosed = true;
-      observer.onCompleted();
-    });
-
-    return function () {
-      connection.isClosed = true;
-      wsc.close();
-    };
-  }).share(); // Keep one, single connection alive
-
-  connection.onNext = function(message) {
-    wsc.send(JSON.stringify(message));
-  };
-
-  connection.onCompleted = connection.onError = function() {
-    connection.isClosed = true;
-    wsc.close();
-  };
-
-  return connection;
-};
-
-function WebSocketServer(options) {
-  return Rx.Observable.create(function(observer) {
-    var wss = new ws.Server(options);
-    wss.on('connection', observer.onNext.bind(observer));
-    wss.on('error', observer.onError.bind(observer));
-
-    return function() {
-      wss.close();
-    };
-  }).select(WebSocketConnection).share();
-}
-
 exports.startServer = function (options) {
-  var server = WebSocketServer(options);
+  var server = RxWebSocketServer(options);
 
   // loopback behavior
   if (true) {
