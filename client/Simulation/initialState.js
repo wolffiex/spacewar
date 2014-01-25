@@ -1,5 +1,5 @@
 var Keys = require('../Keys');
-var Pt = require('../Point').Pt;
+var xy = require('../Point').xy;
 var _ = require('underscore');
 
 var t = 0;
@@ -13,15 +13,15 @@ var keys = {a: initialKeys, b: initialKeys};
 var collisions = [];
 
 var shipA = {
-  pos: Pt(100, 100),
-  spd: Pt(0, 0),
+  pos: xy(100, 100),
+  spd: xy(0, 0),
   rot: Math.PI,
   shots: [],
 };
 
 var shipB = {
-  pos: Pt(200, 200),
-  spd: Pt(0, 0),
+  pos: xy(200, 200),
+  spd: xy(0, 0),
   rot: 0,
   shots: [],
 };

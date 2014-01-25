@@ -1,13 +1,13 @@
 var Point = require('./Point');
 var Ship = require('./Ship');
 var _ = require('underscore');
-var Pt = Point.Pt;
+var xy = Point.xy;
 
 var SHOTS = {
   max : 8,
   delay: 400,
   life: 3000,
-  accel: Pt(0.2, 0),
+  accel: xy(0.2, 0),
 };
 
 // mutates pos

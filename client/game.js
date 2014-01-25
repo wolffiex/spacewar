@@ -7,7 +7,7 @@ var Keys = require('./Keys');
 var Shots = require('./Shots');
 var Simulation = require('./Simulation');
 
-var Pt = Point.Pt;
+var xy = Point.xy;
 
 var GameRenderer = null;
 global.tGameStart = null;
