@@ -6,6 +6,7 @@ var Point = require('./Point');
 var Keys = require('./Keys');
 var Shots = require('./Shots');
 var Simulation = require('./Simulation');
+var notEmpty = require('utils').notEmpty;
 
 var xy = Point.xy;
 
@@ -32,8 +33,6 @@ function initGame(canvas){
     input.k = amA ? 'a' : 'b';
     return input;
   }).share();
-
-  OtherInput = new Rx.Subject();
 
   // This must syncrhonize the input stream
   var inputStreamRaw = KeyInput.merge(OtherInput);
@@ -114,53 +113,57 @@ function initGame(canvas){
 
 global.initGame = initGame;
 
-var socket = new WebSocket("ws://localhost:3001");
-socket.onopen = function (event) {
-  console.log('socket is open')
+var RxWebSocket = require('RxWebSocket');
+var socket = RxWebSocket("ws://localhost:3001");
+
+//var Msg = (key, value) => {key, value};
+var Msg = (m, d) => ({m, d});
+Msg.filter = (key) => function(msg) {
+  return msg.m == key;
 };
 
-function send(message, data) {
-  socket.send(JSON.stringify({m: message, d:data}));
-}
+global.Msg = Msg
+
+var start = socket.filter(Msg.filter('START'))
+  .delay(100)
+  .map( msg => {
+    var k = msg.d.k; 
+    amA = k == 'a';
+    pingTime = Date.now();
+
+    return amA ? Msg('PING', null) : null;
+  });
 
 var pingTime;
 var waitTime = 1000;
-socket.onmessage = function (event) {
-  var o = JSON.parse(event.data);
-  //console.log('RECV', o.m, o.d);
-  switch (o.m) {
-    case 'START':
-      var k = o.d.k; 
-      amA = k == 'a';
-      if (amA) _.delay(() =>{
-        pingTime = Date.now();
-        send('PING', null);
-      }, 100);
-      break;
+
+var sync = socket.map(msg => {
+  //console.log('RECV', msg.m, msg.d);
+  switch (msg.m) {
     case 'PING':
-      send('PONG', Date.now());
-      break;
+      return Msg('PONG', Date.now());
     case 'PONG':
       var pongTime = Date.now();
       var latency = pongTime - pingTime;
-      var otherTime = o.d;
-      send('GO', Math.round(otherTime + latency + waitTime));
+      var otherTime = msg.d;
       go(pongTime + waitTime);
-      break;
+      return Msg('GO', Math.round(otherTime + latency + waitTime));
     case 'GO':
-      go(o.d);
-      break;
-    case 'INPUT':
-      var d = o.d;
-      if (d.t > Date.now() - tGameStart) throw "Lost sync";
-      OtherInput.onNext(d);
+      go(msg.d);
       break;
   }
-}
+
+  return null;
+})
+
+start.merge(sync).filter(notEmpty).subscribe(socket);
+socket.filter(Msg.filter('INPUT')).map(msg => {
+  var d = msg.d;
+  if (d.t > Date.now() - tGameStart) throw "Lost sync";
+  return d;
+}).subscribe(OtherInput);
 
 function go(startTime) {
   var input = startGame(Date.now());
-  input.subscribe(k => send('INPUT', k));
+  input.map(k=>Msg('INPUT', k)).subscribe(socket);
 }
-
-

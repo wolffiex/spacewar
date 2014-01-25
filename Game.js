@@ -1,6 +1,6 @@
 var Rx = require('Rx');
 
-var RxWebSocketServer = require('RxWS').RxWebSocketServer;
+var RxWebSocketServer = require('RxWebSocketServer');
 var utils = require('utils');
 var ws = require('ws');
 var _ = require('underscore');
