@@ -8,28 +8,37 @@ var Shots = require('../Shots');
 var initialState = require('./initialState');
 var TimeBuffer = require('./TimeBuffer');
 
-// When we push a time value onto the updater, it makes a new entry in the
-// keyBuffer for that time. This produces a new value for the ship
-// position
-var driver = new Rx.Subject();
-var carrier = {t:null};
+class Simulation {
+  constructor(inputStream) {
+    this._driver = new Rx.Subject();
+    this._out = new Rx.Subject();
+    this._carrier = {t: null, isUpdate: true};
 
-exports.initialShips = initialState.ships;
+    var stateBuffer = new TimeBuffer(initialState);
+    inputStream.merge(this._driver)
+      .map(simulate.bind(null, stateBuffer))
+      .filter(s => !!s)
+      .subscribe(this._out);
+  }
 
-exports.update = (t) => {
-  carrier.t = t;
-  driver.onNext(carrier);
+  update(t) {
+    this._carrier.t = t;
+    this._driver.onNext(this._carrier);
+  }
+
+  subscribe(subscriber) {
+    this._out.subscribe(subscriber);
+  }
+
 }
 
-exports.getSimulation = inputStream => 
-  inputStream.merge(driver).map(simulate).filter(s => !!s);
+Simulation.initialShips = initialState.ships 
+module.exports = Simulation;
 
-var stateBuffer = new TimeBuffer(initialState);
-
-function simulate(input) {
+function simulate(stateBuffer, input) {
   state = stateBuffer.getBefore(input.t);
 
-  var isNewInput = !!input.action;
+  var isNewAction = !!input.action;
 
   for (var t = state.t; t < input.t; t++) {
     state.collisions = Shots.tickCollisions(state.collisions);
@@ -43,15 +52,14 @@ function simulate(input) {
   }
 
   state.t = input.t;
-  if (isNewInput) {
+  if (input.action) {
     var keys = state.keys[input.k];
     keys[input.action] = input.isDown;
   }
 
-  stateBuffer.save(state, isNewInput);
+  state = stateBuffer.save(state, !!input.action);
 
-  // Only spit out state for driver times
-  return isNewInput ? null : state;
+  return input.isUpdate ? state : null;
 }
 
 function doPlayerTick(k, state) {
@@ -73,7 +81,6 @@ function doPlayerTick(k, state) {
     // this mutates shipA.shots
     var shots = ship.shots;
 
-    // shots also affect speed of ship that was hit
     _.each(newCollisions, function(shotIndex) {
       var collision = shots[shotIndex];
       shots[shotIndex] = null;

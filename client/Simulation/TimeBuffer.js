@@ -46,6 +46,8 @@ class TimeBuffer {
         this._buffer = this._buffer.slice(15);
       }
     }
+
+    return o;
   }
 }
 

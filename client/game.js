@@ -67,10 +67,10 @@ function initGame(canvas){
       Rx.Observable.returnValue(input);
   });
 
-  var simulation = Simulation.getSimulation(inputStream);
+  var simulation = new Simulation(inputStream);
 
   var updateSimulation = function() {
-    Simulation.update(Date.now() - tGameStart);
+    simulation.update(Date.now() - tGameStart);
   }
 
   var renderInfo = {
