@@ -123,11 +123,6 @@ function send(message, data) {
   socket.send(JSON.stringify({m: message, d:data}));
 }
 
-var RxWebSocket = require('RxWS').RxWebSocket;
-
-var sock = RxWebSocket(socket);
-sock.subscribe(x=>console.log('sock', x));
-
 var pingTime;
 var waitTime = 1000;
 socket.onmessage = function (event) {
