@@ -144,7 +144,7 @@ socket.onmessage = function (event) {
       var pongTime = Date.now();
       var latency = pongTime - pingTime;
       var otherTime = o.d;
-      send('GO', Math.round(otherTime + latency/2 + waitTime));
+      send('GO', Math.round(otherTime + latency + waitTime));
       go(pongTime + waitTime);
       break;
     case 'GO':

@@ -1,6 +1,6 @@
 var Rx = require('Rx');
 var _ = require('underscore');
-var deepCopy = require('deepCopy');
+var deepCopy = require('utils').deepCopy;
 
 var Ship = require('../Ship');
 var Shots = require('../Shots');

@@ -1,8 +1,12 @@
 var Rx = require('Rx');
 
-var deepCopy = require('deepCopy');
+var utils = require('utils');
 var ws = require('ws');
 var _ = require('underscore');
+
+var Msg = function(msg, data, player){
+  return {m: msg, d: data}
+};
 
 function WebSocketConnection(wsc) {
   var connection = Rx.Observable.create(function(observer) {
@@ -42,10 +46,6 @@ function WebSocketConnection(wsc) {
   return connection;
 };
 
-var Msg = function(msg, data, player){
-  return {m: msg, d: data}
-};
-
 function WebSocketServer(options) {
   return Rx.Observable.create(function(observer) {
     var wss = new ws.Server(options);
@@ -57,9 +57,6 @@ function WebSocketServer(options) {
     };
   }).select(WebSocketConnection).share();
 }
-
-function notNull(x) {return x != null;}
-function assert(x) {if (!x) throw "Assertion failed"};
 
 exports.startServer = function (options) {
   var server = WebSocketServer(options);
@@ -93,12 +90,12 @@ function loopback(connection) {
     connection.map(function(o) {
       // Don't allow game to start twice
       if (o.m == 'GO') return null;
-      var copy = deepCopy(o);
+      var copy = utils.deepCopy(o);
       if (copy.m == 'INPUT') {
         copy.d.k = o.d.k == 'a' ? 'b' : 'a';
       }
       return copy;
-    }).filter(notNull)
+    }).filter(utils.notEmpty)
     .delay(200)
     .subscribe(observer);
   }).share();
