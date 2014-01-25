@@ -11,61 +11,40 @@ var notEmpty = require('utils').notEmpty;
 var xy = Point.xy;
 
 var GameRenderer = null;
-global.tGameStart = null;
+var tGameStart = null;
 
 function startGame(t) {
   if (!GameRenderer) throw "Game didn't init"
-  tGameStart = t;
+  tGameStart = Date.now() //t;
 
   requestAnimationFrame(GameRenderer);
-  return KeyInput;
 }
 
-var KeyInput = null;
-var OtherInput = new Rx.Subject();
 var amA = true;
 
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
 
-  KeyInput = Keys.getStream(document).map(input => {
-    input.t = Date.now() - tGameStart;
-    input.k = amA ? 'a' : 'b';
-    return input;
-  }).share();
+  var socket = getSocket();
 
-  // This must syncrhonize the input stream
-  var inputStreamRaw = KeyInput.merge(OtherInput);
+  var keyInput = Keys.getStream(document)
+    .map(input => {
+      input.t = Date.now() - tGameStart;
+      input.k = amA ? 'a' : 'b';
+      return input;
+    })
+    .share();
 
-  var inputBufferList = [{t:0}];
+  keyInput.map(k=>Msg('INPUT', k)).subscribe(socket);
 
-  var inputStream = inputStreamRaw.flatMap(input => {
-    var list = inputBufferList;
-    var ot = _.last(list).t;
-
-    // we need to put this at the last possible spot
-    // e.g. list = {t:0}, {t:1}, {t:1}, {t:3}
-    // and we receive a new {t:1}, it has to go right before t:3
-    var z = list.length;
-    var y = z-1;
-    list.push(input);
-
-    var needsBuffering = false;
-    while(list[y].t > list[z].t) {
-      needsBuffering = true;
-      var tmp = list[z];
-      list[z] = list[y];
-      list[y] = tmp;
-      y--; z--;
-    }
-
-    // TODO: Trim list
-
-    return needsBuffering ?
-      Rx.Observable.fromArray(list.slice(y+1)) :
-      Rx.Observable.returnValue(input);
-  });
-
+  var inputStream = bufferInput(
+    keyInput.merge(
+      socket.filter(Msg.filter('INPUT')).map(msg => {
+        var d = msg.d;
+        if (d.t > Date.now() - tGameStart) throw "Lost sync";
+        return d;
+      })));
+  
   var simulation = new Simulation(inputStream);
 
   var updateSimulation = function() {
@@ -114,7 +93,6 @@ function initGame(canvas){
 global.initGame = initGame;
 
 var RxWebSocket = require('RxWebSocket');
-var socket = RxWebSocket("ws://localhost:3001");
 
 //var Msg = (key, value) => {key, value};
 var Msg = (m, d) => ({m, d});
@@ -122,48 +100,71 @@ Msg.filter = (key) => function(msg) {
   return msg.m == key;
 };
 
-global.Msg = Msg
+function getSocket() {
+  var socket = RxWebSocket("ws://localhost:3001");
 
-var start = socket.filter(Msg.filter('START'))
-  .delay(100)
-  .map( msg => {
-    var k = msg.d.k; 
-    amA = k == 'a';
-    pingTime = Date.now();
+  var start = socket.filter(Msg.filter('START'))
+    .delay(100)
+    .map( msg => {
+      var k = msg.d.k; 
+      amA = k == 'a';
+      pingTime = Date.now();
 
-    return amA ? Msg('PING', null) : null;
+      return amA ? Msg('PING', null) : null;
+    });
+
+  var pingTime;
+  var waitTime = 1000;
+
+  var sync = socket.map(msg => {
+    //console.log('RECV', msg.m, msg.d);
+    switch (msg.m) {
+      case 'PING':
+        return Msg('PONG', Date.now());
+      case 'PONG':
+        var pongTime = Date.now();
+        var latency = pongTime - pingTime;
+        var otherTime = msg.d;
+        startGame(pongTime + waitTime);
+        return Msg('GO', Math.round(otherTime + latency + waitTime));
+      case 'GO':
+        startGame(msg.d);
+        break;
+    }
+
+    return null;
+  })
+
+  start.merge(sync).filter(notEmpty).subscribe(socket);
+  return socket;
+}
+
+function bufferInput(rawInputStream) {
+  var inputBufferList = [{t:0}];
+  return rawInputStream.flatMap(input => {
+    var list = inputBufferList;
+    var ot = _.last(list).t;
+
+    // we need to put this at the last possible spot
+    // e.g. list = {t:0}, {t:1}, {t:1}, {t:3}
+    // and we receive a new {t:1}, it has to go right before t:3
+    var z = list.length;
+    var y = z-1;
+    list.push(input);
+
+    var needsBuffering = false;
+    while(list[y].t > list[z].t) {
+      needsBuffering = true;
+      var tmp = list[z];
+      list[z] = list[y];
+      list[y] = tmp;
+      y--; z--;
+    }
+
+    // TODO: Trim list
+
+    return needsBuffering ?
+      Rx.Observable.fromArray(list.slice(y+1)) :
+      Rx.Observable.returnValue(input);
   });
-
-var pingTime;
-var waitTime = 1000;
-
-var sync = socket.map(msg => {
-  //console.log('RECV', msg.m, msg.d);
-  switch (msg.m) {
-    case 'PING':
-      return Msg('PONG', Date.now());
-    case 'PONG':
-      var pongTime = Date.now();
-      var latency = pongTime - pingTime;
-      var otherTime = msg.d;
-      go(pongTime + waitTime);
-      return Msg('GO', Math.round(otherTime + latency + waitTime));
-    case 'GO':
-      go(msg.d);
-      break;
-  }
-
-  return null;
-})
-
-start.merge(sync).filter(notEmpty).subscribe(socket);
-socket.filter(Msg.filter('INPUT')).map(msg => {
-  var d = msg.d;
-  if (d.t > Date.now() - tGameStart) throw "Lost sync";
-  return d;
-}).subscribe(OtherInput);
-
-function go(startTime) {
-  var input = startGame(Date.now());
-  input.map(k=>Msg('INPUT', k)).subscribe(socket);
 }
