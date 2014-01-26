@@ -20,17 +20,19 @@ function startGame(t) {
   requestAnimationFrame(GameRenderer);
 }
 
-var amA = true;
-
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
 
-  var socket = getSocket();
+  var socket = RxWebSocket("ws://localhost:3001");
+
+  var player = getPlayer(socket);
+
+  getSocket(socket);
 
   var keyInput = Keys.getStream(document)
-    .map(input => {
+    .combineLatest(player, (input, k) => {
       input.t = Date.now() - tGameStart;
-      input.k = amA ? 'a' : 'b';
+      input.k = k;
       return input;
     })
     .share();
@@ -100,19 +102,26 @@ Msg.filter = (key) => function(msg) {
   return msg.m == key;
 };
 
-function getSocket() {
-  var socket = RxWebSocket("ws://localhost:3001");
 
-  var start = socket.filter(Msg.filter('START'))
+function getPlayer(socket) {
+  var start = socket.filter(Msg.filter('START'));
+
+  var player = start.map(msg =>msg.d.k);
+
+  player
     .delay(100)
-    .map( msg => {
-      var k = msg.d.k; 
-      amA = k == 'a';
+    .filter(k => k == 'a')
+    .map( k => {
       pingTime = Date.now();
+      return Msg('PING', null);
+    })
+    .subscribe(socket);
 
-      return amA ? Msg('PING', null) : null;
-    });
+  return player;
 
+}
+
+function getSocket(socket) {
   var pingTime;
   var waitTime = 1000;
 
@@ -135,7 +144,7 @@ function getSocket() {
     return null;
   })
 
-  start.merge(sync).filter(notEmpty).subscribe(socket);
+  sync.filter(notEmpty).subscribe(socket);
   return socket;
 }
 
