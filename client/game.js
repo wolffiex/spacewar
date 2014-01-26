@@ -10,8 +10,6 @@ var notEmpty = require('utils').notEmpty;
 
 var xy = Point.xy;
 
-var tGameStart = null;
-
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
 
@@ -19,9 +17,11 @@ function initGame(canvas){
 
   var gameInfo = getGameInfo(socket);
 
+  var tGameStart = null;
   var keyInput = Keys.getStream(document)
     .combineLatest(gameInfo, (input, game) => {
-      var t = Date.now() - tGameStart;
+      var t = Date.now() - game.t;
+      tGameStart = game.t;
       if (t<0) return null;
 
       input.t = t;
@@ -37,34 +37,57 @@ function initGame(canvas){
     keyInput.merge(
       socket.filter(Msg.filter('INPUT')).map(msg => {
         var d = msg.d;
-        if (d.t > Date.now() - tGameStart) throw "Lost sync";
+        // FIXME
+        //if (d.t > Date.now() - tGameStart) throw "Lost sync";
         return d;
       })));
   
-  var simulation = new Simulation(inputStream);
-
-  var updateSimulation = function() {
-    if (tGameStart == null) return;
-    var t = Date.now() - tGameStart;
-    if (t >=0) simulation.update(t);
+  var timer = new Rx.Subject();
+  function updateTimer() {
+    timer.onNext(Date.now());
   }
 
+  var gameTime = timer.combineLatest(gameInfo, function(update, game) {
+    return update - game.t;
+  });
+
+  var updater = gameTime
+    .filter(t => t >=0 )
+    // scan here is for efficiency, to avoid object creation
+    // in the middle of the render loop
+    .scan({t: null, isUpdate: true}, function(carrier, t) {
+      carrier.t = t;
+      return carrier;
+    });
+
+  var countdown = gameTime.takeUntil(updater).map(t => t * -1);
+
+  countdown.subscribe(x => console.log('down', x));
+
+  var simulation = new Simulation(inputStream.merge(updater));
+
   var renderInfo = {
+    startTime: null,
     ships : Simulation.initialShips,
     collisions : [],
   };
 
   // This is optimized not to create an object
   simulation.subscribe(state => {
-    if (state) {
-      renderInfo.ships = state.ships;
-      renderInfo.collisions = state.collisions;
-    }
+    renderInfo.ships = state.ships;
+    renderInfo.collisions = state.collisions;
   });
 
-  GameRenderer = function (time) {
+  GameRenderer = function () {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, Point.screenSize.x, Point.screenSize.y);
+
+    var startTime = renderInfo.startTime;
+
+    //console.log(time)
+    if (renderInfo.countdown) {
+      console.log('wanna who', renderInfo.countdown);
+    }
 
     ctx.fillStyle = '#0FF';
     Ship.draw(ctx, renderInfo.ships.a);
@@ -84,7 +107,7 @@ function initGame(canvas){
     }
 
     requestAnimationFrame(GameRenderer);
-    _.defer(updateSimulation);
+    _.defer(updateTimer);
   };
 
   requestAnimationFrame(GameRenderer);
@@ -137,8 +160,7 @@ function getGameInfo(socket) {
   // Game info
   var goMsg = sendGo.merge(recvMsg('GO'));
   return player.zip(goMsg, function(k, msg) {
-    tGameStart = msg.d[k];
-    console.log('start', msg.d, k, tGameStart, Date.now())
+    console.log('start', msg.d, k, Date.now())
     return {
       k : k,
       t : msg.d[k],

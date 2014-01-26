@@ -8,34 +8,18 @@ var Shots = require('../Shots');
 var initialState = require('./initialState');
 var TimeBuffer = require('./TimeBuffer');
 
-class Simulation {
-  constructor(inputStream) {
-    this._driver = new Rx.Subject();
-    this._out = new Rx.Subject();
-    this._carrier = {t: null, isUpdate: true};
-
-    var stateBuffer = new TimeBuffer(initialState);
-    inputStream.merge(this._driver)
-      .map(simulate.bind(null, stateBuffer))
-      .filter(s => !!s)
-      .subscribe(this._out);
-  }
-
-  update(t) {
-    this._carrier.t = t;
-    this._driver.onNext(this._carrier);
-  }
-
-  subscribe(subscriber) {
-    this._out.subscribe(subscriber);
-  }
-
+function Simulation(inputStream) {
+  var stateBuffer = new TimeBuffer(initialState);
+  return inputStream
+    .map(simulate.bind(null, stateBuffer))
+    .filter(s => !!s);
 }
 
 Simulation.initialShips = initialState.ships 
 module.exports = Simulation;
 
 function simulate(stateBuffer, input) {
+  if (input.t < 0) return;
   state = stateBuffer.getBefore(input.t);
 
   var isNewAction = !!input.action;
