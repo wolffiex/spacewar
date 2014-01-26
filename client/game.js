@@ -175,17 +175,18 @@ function getGameInfo(socket) {
     }).share();
 
   // Outbound stream to socket
-  sendPing.merge(sendPong, sendGo).subscribe(socket);
+  sendPing.merge(sendPong).merge(sendGo).subscribe(socket);
 
   // Game info
   var goMsg = sendGo.merge(recvMsg('GO'));
+
   return player.zip(goMsg, function(k, msg) {
     console.log('start', msg.d, k, Date.now())
     return {
       k : k,
       t : msg.d[k],
     };
-  });
+  }).share();
 }
 
 
