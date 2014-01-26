@@ -10,31 +10,25 @@ var notEmpty = require('utils').notEmpty;
 
 var xy = Point.xy;
 
-var GameRenderer = null;
 var tGameStart = null;
-
-function startGame(t) {
-  if (!GameRenderer) throw "Game didn't init"
-  tGameStart = Date.now() //t;
-
-  requestAnimationFrame(GameRenderer);
-}
 
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
 
   var socket = RxWebSocket("ws://localhost:3001");
 
-  var player = getPlayer(socket);
-
-  getSocket(socket);
+  var gameInfo = getGameInfo(socket);
 
   var keyInput = Keys.getStream(document)
-    .combineLatest(player, (input, k) => {
-      input.t = Date.now() - tGameStart;
-      input.k = k;
+    .combineLatest(gameInfo, (input, game) => {
+      var t = Date.now() - tGameStart;
+      if (t<0) return null;
+
+      input.t = t;
+      input.k = game.k;
       return input;
     })
+    .filter(notEmpty)
     .share();
 
   keyInput.map(k=>Msg('INPUT', k)).subscribe(socket);
@@ -50,7 +44,9 @@ function initGame(canvas){
   var simulation = new Simulation(inputStream);
 
   var updateSimulation = function() {
-    simulation.update(Date.now() - tGameStart);
+    if (tGameStart == null) return;
+    var t = Date.now() - tGameStart;
+    if (t >=0) simulation.update(t);
   }
 
   var renderInfo = {
@@ -90,6 +86,8 @@ function initGame(canvas){
     requestAnimationFrame(GameRenderer);
     _.defer(updateSimulation);
   };
+
+  requestAnimationFrame(GameRenderer);
 }
 
 global.initGame = initGame;
@@ -97,56 +95,57 @@ global.initGame = initGame;
 var RxWebSocket = require('RxWebSocket');
 
 //var Msg = (key, value) => {key, value};
-var Msg = (m, d) => ({m, d});
+var Msg = (m, d=null) => ({m, d});
 Msg.filter = (key) => function(msg) {
   return msg.m == key;
 };
 
+var INTRO_TIME = 5000;
+function getGameInfo(socket) {
+  // INPUT messages are not part of the game setup
+  // but this is really just an optimization
+  var game = socket.filter(msg => msg.m != 'INPUT');
 
-function getPlayer(socket) {
-  var start = socket.filter(Msg.filter('START'));
+  var recvMsg = k => game.filter(msg => msg.m == k);
 
-  var player = start.map(msg =>msg.d.k);
+  var player = recvMsg('START').map(msg =>msg.d.k);
+  // Player a: Send PING -> Recv PONG -> Send GO
+  var sendPing = player.filter(k => k == 'a')
+    // Delay allows game time to initialize so timing doesn't get messed up
+    .delay(100) 
+    .map( () => Msg('PING', Date.now()) ).share();
 
-  player
-    .delay(100)
-    .filter(k => k == 'a')
-    .map( k => {
-      pingTime = Date.now();
-      return Msg('PING', null);
-    })
-    .subscribe(socket);
+  // Player b: Recv PING -> SEND PONG -> Recv GO
+  var sendPong = recvMsg('PING')
+    .map(msg => Msg('PONG', {pong: Date.now(), ping: msg.d}) )
+    .share();
 
-  return player;
+  var sendGo = recvMsg('PONG')
+    .map(msg => {
+      var now = Date.now();
+      var latency = now - msg.d.ping;
+      var pong = msg.d.pong;
 
+      return Msg('GO', {
+        a : now + INTRO_TIME,
+        b : Math.round(pong + latency + INTRO_TIME)});
+    }).share();
+
+  // Outbound stream to socket
+  sendPing.merge(sendPong, sendGo).subscribe(socket);
+
+  // Game info
+  var goMsg = sendGo.merge(recvMsg('GO'));
+  return player.zip(goMsg, function(k, msg) {
+    tGameStart = msg.d[k];
+    console.log('start', msg.d, k, tGameStart, Date.now())
+    return {
+      k : k,
+      t : msg.d[k],
+    };
+  });
 }
 
-function getSocket(socket) {
-  var pingTime;
-  var waitTime = 1000;
-
-  var sync = socket.map(msg => {
-    //console.log('RECV', msg.m, msg.d);
-    switch (msg.m) {
-      case 'PING':
-        return Msg('PONG', Date.now());
-      case 'PONG':
-        var pongTime = Date.now();
-        var latency = pongTime - pingTime;
-        var otherTime = msg.d;
-        startGame(pongTime + waitTime);
-        return Msg('GO', Math.round(otherTime + latency + waitTime));
-      case 'GO':
-        startGame(msg.d);
-        break;
-    }
-
-    return null;
-  })
-
-  sync.filter(notEmpty).subscribe(socket);
-  return socket;
-}
 
 function bufferInput(rawInputStream) {
   var inputBufferList = [{t:0}];
