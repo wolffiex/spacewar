@@ -62,7 +62,7 @@ function initGame(canvas){
 
   var countdown = gameTime.takeUntil(updater).map(t => t * -1);
 
-  countdown.subscribe(x => console.log('down', x));
+  //countdown.subscribe(x => console.log('down', x));
 
   var simulation = new Simulation(inputStream.merge(updater));
 
@@ -78,17 +78,19 @@ function initGame(canvas){
     renderInfo.collisions = state.collisions;
   });
 
+  countdown.subscribe(
+    t => { renderInfo.countdown = t},
+    () => { console.error('Countdown error')},
+    () => { console.log('ocom'); renderInfo.countdown = null},
+  );
+
   GameRenderer = function () {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, Point.screenSize.x, Point.screenSize.y);
 
     var startTime = renderInfo.startTime;
 
-    //console.log(time)
-    if (renderInfo.countdown) {
-      console.log('wanna who', renderInfo.countdown);
-    }
-
+    ctx.globalAlpha = 1;
     ctx.fillStyle = '#0FF';
     Ship.draw(ctx, renderInfo.ships.a);
     ctx.fillStyle = '#F0F';
@@ -105,6 +107,24 @@ function initGame(canvas){
     if (renderInfo.collisions.length) {
       Shots.drawCollisions(ctx, renderInfo.collisions);
     }
+
+    if (renderInfo.countdown != null) {
+      ctx.fillStyle = '#FFF';
+      ctx.moveTo(200,200);
+      var basesize = 200;
+      var t = renderInfo.countdown;
+      var tSec = t/1000;
+      var tSecInt = Math.floor(tSec);
+      var tNano = tSec - tSecInt;
+
+      var secPercent = 1 -tNano;
+      ctx.globalAlpha = tNano;
+
+      var fontSize = 80 + Math.floor(secPercent * basesize);
+      ctx.font=fontSize + "px Courier";
+      ctx.fillText(tSecInt+1, 200, 200);
+    }
+
 
     requestAnimationFrame(GameRenderer);
     _.defer(updateTimer);
