@@ -167,6 +167,7 @@ function getGameInfo(socket) {
     .map(msg => {
       var now = Date.now();
       var latency = now - msg.d.ping;
+      console.log(latency)
       var pong = msg.d.pong;
 
       return Msg('GO', {

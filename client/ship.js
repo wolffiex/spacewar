@@ -41,8 +41,8 @@ function _draw(ctx, pos, r) {
   ctx.fill();
 }
 
-var rotSpeed = 0.001;
-var thrustAccel = xy(0.0002, 0);
+var rotSpeed = 0.003;
+var thrustAccel = xy(0.0004, 0);
 
 // Mutates ship
 exports.inputTick = function(ship, keys) {
@@ -69,7 +69,7 @@ exports.inputTick = function(ship, keys) {
   return ship;
 }
 
-var maxSpd = xy(0.4, 0);
+var maxSpd = xy(0.2, 0);
 var maxSpdHyp = maxSpd.x * maxSpd.x;
 function limitSpeed(spd) {
   var spdX = spd.x;

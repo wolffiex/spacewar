@@ -4,9 +4,9 @@ var _ = require('underscore');
 var xy = Point.xy;
 
 var SHOTS = {
-  max : 8,
+  max : 18,
   delay: 400,
-  life: 3000,
+  life: 1600,
   accel: xy(0.2, 0),
 };
 
