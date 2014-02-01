@@ -1,6 +1,7 @@
 var Rx = require('Rx');
 var _ = require('underscore');
 
+var RxWebSocket = require('RxWebSocket');
 var Ship = require('./Ship');
 var Point = require('./Point');
 var Keys = require('./Keys');
@@ -11,15 +12,18 @@ var Msg = require('utils').Msg;
 
 var xy = Point.xy;
 
-function initGame(doc, canvas){
-  var ctx = canvas.getContext('2d');
+/*
+  TODO
+  - Simplify this function
+  - Server replay feature
+  - Backwards feature
+  - Key input opens last n streams of state, use select
+  - Game timer reads key input
+*/
 
-  var hostname = doc.location.hostname;
-  var socket = RxWebSocket("ws://" + hostname + ":3001");
 
-  var gameInfo = getGameInfo(socket);
-
-  var keyInput = Keys.getStream(doc)
+function combineKeysAndGame(keysInfo, gameInfo) {
+  return keysInfo
     .combineLatest(gameInfo, (input, game) => {
       var t = Date.now() - game.t;
       if (t<0) return null;
@@ -30,14 +34,30 @@ function initGame(doc, canvas){
     })
     .filter(notEmpty)
     .share();
+}
 
+function initGame(doc, canvas){
+  var ctx = canvas.getContext('2d');
+
+  var hostname = doc.location.hostname;
+  var socket = RxWebSocket("ws://" + hostname + ":3001");
+
+  // Game start and player info
+  var gameInfo = getGameInfo(socket);
+
+  // Mark key input with player and relative game time
+  var keyInput = combineKeysAndGame(Keys.getStream(doc), gameInfo);
+
+  // Send local input to other player
   keyInput.map(k=>Msg('INPUT', k)).subscribe(socket);
 
+  // All input is buffered to handle out of order arrival
   var inputStream = bufferInput(
     keyInput.merge(
       socket.filter(Msg.filter('INPUT')).map(Msg.value)));
   
   var timer = new Rx.Subject();
+
   function updateTimer() {
     timer.onNext(Date.now());
   }
@@ -58,7 +78,7 @@ function initGame(doc, canvas){
 
   //countdown.subscribe(x => console.log('down', x));
 
-  var simulation = new Simulation(inputStream.merge(updater));
+  var simulation = Simulation(inputStream.merge(updater));
 
   var renderInfo = {
     startTime: null,
@@ -77,66 +97,67 @@ function initGame(doc, canvas){
     () => { renderInfo.countdown = null},
   );
 
-  GameRenderer = function () {
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, Point.screenSize.x, Point.screenSize.y);
-
-    var startTime = renderInfo.startTime;
-
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#0FF';
-    Ship.draw(ctx, renderInfo.ships.a);
-    ctx.fillStyle = '#F0F';
-    Ship.draw(ctx, renderInfo.ships.b);
-
-    ctx.fillStyle = '#0FF';
-    var shotsA = renderInfo.ships.a.shots;
-    if (shotsA.length) Shots.draw(ctx, shotsA);
-
-    var shotsB = renderInfo.ships.b.shots;
-    ctx.fillStyle = '#F0F';
-    if (shotsB.length) Shots.draw(ctx, shotsB);
-
-    if (renderInfo.collisions.length) {
-      Shots.drawCollisions(ctx, renderInfo.collisions);
-    }
-
-    if (renderInfo.countdown != null) {
-      ctx.fillStyle = '#FFF';
-      ctx.moveTo(200,200);
-      var basesize = 200;
-      var t = renderInfo.countdown;
-      var tSec = t/1000;
-      var tSecInt = Math.floor(tSec);
-      var tNano = tSec - tSecInt;
-
-      var secPercent = 1 -tNano;
-      ctx.globalAlpha = tNano;
-
-      var fontSize = 80 + Math.floor(secPercent * basesize);
-      ctx.font=fontSize + "px Courier";
-      ctx.fillText(tSecInt+1, 200, 200);
-    }
-
-
-    requestAnimationFrame(GameRenderer);
+  function render() {
+    draw(ctx, renderInfo);
+    requestAnimationFrame(render);
     _.defer(updateTimer);
   };
 
-  requestAnimationFrame(GameRenderer);
+  requestAnimationFrame(render);
+}
+
+function draw(ctx, renderInfo) {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, Point.screenSize.x, Point.screenSize.y);
+
+  var startTime = renderInfo.startTime;
+
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#0FF';
+  Ship.draw(ctx, renderInfo.ships.a);
+  ctx.fillStyle = '#F0F';
+  Ship.draw(ctx, renderInfo.ships.b);
+
+  ctx.fillStyle = '#0FF';
+  var shotsA = renderInfo.ships.a.shots;
+  if (shotsA.length) Shots.draw(ctx, shotsA);
+
+  var shotsB = renderInfo.ships.b.shots;
+  ctx.fillStyle = '#F0F';
+  if (shotsB.length) Shots.draw(ctx, shotsB);
+
+  if (renderInfo.collisions.length) {
+    Shots.drawCollisions(ctx, renderInfo.collisions);
+  }
+
+  if (renderInfo.countdown != null) {
+    ctx.fillStyle = '#FFF';
+    ctx.moveTo(200,200);
+    var basesize = 200;
+    var t = renderInfo.countdown;
+    var tSec = t/1000;
+    var tSecInt = Math.floor(tSec);
+    var tNano = tSec - tSecInt;
+
+    var secPercent = 1 -tNano;
+    ctx.globalAlpha = tNano;
+
+    var fontSize = 80 + Math.floor(secPercent * basesize);
+    ctx.font=fontSize + "px Courier";
+    ctx.fillText(tSecInt+1, 200, 200);
+  }
 }
 
 global.initGame = initGame;
 
-var RxWebSocket = require('RxWebSocket');
 
 var INTRO_TIME = 5000;
 function getGameInfo(socket) {
   // INPUT messages are not part of the game setup
   // but this is really just an optimization
-  var game = socket.filter(msg => msg.key != 'INPUT');
+  var game = socket.filter(msg => msg.key != 'INPUT').share();
 
-  var recvMsg = k => game.filter(msg => msg.key == k);
+  var recvMsg = k => game.filter(Msg.filter(k));
 
   var player = recvMsg('START').map(msg =>msg.value.player);
   // Player a: Send PING -> Recv PONG -> Send GO
