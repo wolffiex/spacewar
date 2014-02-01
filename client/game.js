@@ -65,7 +65,6 @@ function initGame(doc, canvas){
     collisions : [],
   };
 
-  // This is optimized not to create an object
   simulation.subscribe(state => {
     renderInfo.ships = state.ships;
     renderInfo.collisions = state.collisions;

@@ -20,9 +20,15 @@ module.exports = Simulation;
 
 function simulate(stateBuffer, input) {
   if (input.t < 0) return;
+  var isNewAction = !!input.action;
+
+  if (!isNewAction && !stateBuffer.isLast(input.t)) {
+    console.log(input, stateBuffer._last)
+    throw "Received input from the future";
+  }
+    
   state = stateBuffer.getBefore(input.t);
 
-  var isNewAction = !!input.action;
 
   for (var t = state.t; t < input.t; t++) {
     state.collisions = Shots.tickCollisions(state.collisions);

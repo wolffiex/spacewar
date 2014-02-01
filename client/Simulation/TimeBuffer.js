@@ -8,8 +8,12 @@ class TimeBuffer {
     this._last = deepCopy(initial);
   }
 
+  isLast(t) {
+    return t > this._last.t;
+  }
+
   getBefore(t) {
-    if (this._last.t > t) {
+    if (!this.isLast(t)) {
       // At the very least, this._last is out of date, so we will
       // take the last state from the stateBuffer. It's possible
       // that the last entry on the stateBuffer is good, though
