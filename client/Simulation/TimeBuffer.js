@@ -9,7 +9,7 @@ class TimeBuffer {
   }
 
   isLast(t) {
-    return t > this._last.t;
+    return t >= this._last.t;
   }
 
   getBefore(t) {

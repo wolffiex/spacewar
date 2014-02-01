@@ -5,9 +5,6 @@ var utils = require('utils');
 var ws = require('ws');
 var _ = require('underscore');
 
-var Msg = function(msg, data, player){
-  return {m: msg, d: data}
-};
 
 exports.startServer = function (options) {
   var server = RxWebSocketServer(options);
@@ -25,10 +22,10 @@ exports.startServer = function (options) {
     var b = game[1];
 
     var now = Date.now();
-    Rx.Observable.return(Msg('START', {k:'a', t: now}))
+    Rx.Observable.return(utils.Msg('START', {k:'a', t: now}))
       .merge(b).subscribe(a);
 
-    Rx.Observable.return(Msg('START', {k:'b', t: now}))
+    Rx.Observable.return(utils.Msg('START', {k:'b', t: now}))
       .merge(a).subscribe(b);
 
     // Return an Observable which is the log of the game
@@ -38,12 +35,12 @@ exports.startServer = function (options) {
 
 function loopback(connection) {
   var looped = Rx.Observable.create(function(observer) {
-    connection.map(function(o) {
+    connection.map(function(msg) {
       // Don't allow game to start twice
-      if (o.m == 'GO') return null;
-      var copy = utils.deepCopy(o);
-      if (copy.m == 'INPUT') {
-        copy.d.k = o.d.k == 'a' ? 'b' : 'a';
+      if (msg.key == 'GO') return null;
+      var copy = utils.deepCopy(msg);
+      if (copy.key == 'INPUT') {
+        copy.value.k = msg.value.k == 'a' ? 'b' : 'a';
       }
       return copy;
     }).filter(utils.notEmpty)

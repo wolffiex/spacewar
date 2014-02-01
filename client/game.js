@@ -7,6 +7,7 @@ var Keys = require('./Keys');
 var Shots = require('./Shots');
 var Simulation = require('./Simulation');
 var notEmpty = require('utils').notEmpty;
+var Msg = require('utils').Msg;
 
 var xy = Point.xy;
 
@@ -34,7 +35,7 @@ function initGame(doc, canvas){
 
   var inputStream = bufferInput(
     keyInput.merge(
-      socket.filter(Msg.filter('INPUT')).map(msg => msg.d)));
+      socket.filter(Msg.filter('INPUT')).map(Msg.value)));
   
   var timer = new Rx.Subject();
   function updateTimer() {
@@ -129,21 +130,15 @@ global.initGame = initGame;
 
 var RxWebSocket = require('RxWebSocket');
 
-//var Msg = (key, value) => {key, value};
-var Msg = (m, d=null) => ({m, d});
-Msg.filter = (key) => function(msg) {
-  return msg.m == key;
-};
-
 var INTRO_TIME = 5000;
 function getGameInfo(socket) {
   // INPUT messages are not part of the game setup
   // but this is really just an optimization
-  var game = socket.filter(msg => msg.m != 'INPUT');
+  var game = socket.filter(msg => msg.key != 'INPUT');
 
-  var recvMsg = k => game.filter(msg => msg.m == k);
+  var recvMsg = k => game.filter(msg => msg.key == k);
 
-  var player = recvMsg('START').map(msg =>msg.d.k);
+  var player = recvMsg('START').map(msg =>msg.value.k);
   // Player a: Send PING -> Recv PONG -> Send GO
   var sendPing = player.filter(k => k == 'a')
     // Delay allows game time to initialize so timing doesn't get messed up
@@ -152,14 +147,14 @@ function getGameInfo(socket) {
 
   // Player b: Recv PING -> SEND PONG -> Recv GO
   var sendPong = recvMsg('PING')
-    .map(msg => Msg('PONG', {pong: Date.now(), ping: msg.d}) )
+    .map(msg => Msg('PONG', {pong: Date.now(), ping: msg.value}) )
     .share();
 
   var sendGo = recvMsg('PONG')
     .map(msg => {
       var now = Date.now();
-      var latency = now - msg.d.ping;
-      var pong = msg.d.pong;
+      var latency = now - msg.value.ping;
+      var pong = msg.value.pong;
 
       return Msg('GO', {
         a : now + INTRO_TIME,
@@ -175,7 +170,7 @@ function getGameInfo(socket) {
   return player.zip(goMsg, function(k, msg) {
     return {
       k : k,
-      t : msg.d[k],
+      t : msg.value[k],
     };
   }).share();
 }
