@@ -25,7 +25,7 @@ function initGame(doc, canvas){
       if (t<0) return null;
 
       input.t = t;
-      input.k = game.k;
+      input.player = game.player;
       return input;
     })
     .filter(notEmpty)
@@ -138,9 +138,9 @@ function getGameInfo(socket) {
 
   var recvMsg = k => game.filter(msg => msg.key == k);
 
-  var player = recvMsg('START').map(msg =>msg.value.k);
+  var player = recvMsg('START').map(msg =>msg.value.player);
   // Player a: Send PING -> Recv PONG -> Send GO
-  var sendPing = player.filter(k => k == 'a')
+  var sendPing = player.filter(p => p == 'a')
     // Delay allows game time to initialize so timing doesn't get messed up
     .delay(100) 
     .map( () => Msg('PING', Date.now()) ).share();
@@ -167,10 +167,10 @@ function getGameInfo(socket) {
   // Game info
   var goMsg = sendGo.merge(recvMsg('GO'));
 
-  return player.zip(goMsg, function(k, msg) {
+  return player.zip(goMsg, function(p, msg) {
     return {
-      k : k,
-      t : msg.value[k],
+      player : p,
+      t : msg.value[p],
     };
   }).share();
 }

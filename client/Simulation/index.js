@@ -37,13 +37,13 @@ function simulate(stateBuffer, input) {
   }
 
   if (input.action == 'fire' && input.isDown) {
-    var ship = state.ships[input.k];
+    var ship = state.ships[input.player];
     ship.shots = Shots.startFire(ship, t);
   }
 
   state.t = input.t;
   if (input.action) {
-    var keys = state.keys[input.k];
+    var keys = state.keys[input.player];
     keys[input.action] = input.isDown;
   }
 
@@ -52,11 +52,11 @@ function simulate(stateBuffer, input) {
   return input.isUpdate ? state : null;
 }
 
-function doPlayerTick(k, state) {
-  var ship = state.ships[k];
-  var keys = state.keys[k];
+function doPlayerTick(player, state) {
+  var ship = state.ships[player];
+  var keys = state.keys[player];
 
-  var oShip = state.ships[k == 'a' ? 'b' : 'a'];
+  var oShip = state.ships[player == 'a' ? 'b' : 'a'];
 
   ship = Ship.inputTick(ship, keys);
   ship.shots = Shots.tickShots(ship.shots);
@@ -89,6 +89,6 @@ function doPlayerTick(k, state) {
     ship.shots = _.compact(shots);
   }
 
-  state.ships[k] = ship;
+  state.ships[player] = ship;
   return state;
 }

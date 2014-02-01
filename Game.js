@@ -22,10 +22,10 @@ exports.startServer = function (options) {
     var b = game[1];
 
     var now = Date.now();
-    Rx.Observable.return(utils.Msg('START', {k:'a', t: now}))
+    Rx.Observable.return(utils.Msg('START', {player:'a', t: now}))
       .merge(b).subscribe(a);
 
-    Rx.Observable.return(utils.Msg('START', {k:'b', t: now}))
+    Rx.Observable.return(utils.Msg('START', {player:'b', t: now}))
       .merge(a).subscribe(b);
 
     // Return an Observable which is the log of the game
@@ -40,7 +40,7 @@ function loopback(connection) {
       if (msg.key == 'GO') return null;
       var copy = utils.deepCopy(msg);
       if (copy.key == 'INPUT') {
-        copy.value.k = msg.value.k == 'a' ? 'b' : 'a';
+        copy.value.player = msg.value.player == 'a' ? 'b' : 'a';
       }
       return copy;
     }).filter(utils.notEmpty)
