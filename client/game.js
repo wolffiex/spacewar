@@ -10,16 +10,16 @@ var notEmpty = require('utils').notEmpty;
 
 var xy = Point.xy;
 
-function initGame(canvas){
+function initGame(doc, canvas){
   var ctx = canvas.getContext('2d');
 
-  // FIXME: Get URL from document
-  var socket = RxWebSocket("ws://localhost:3001");
+  var hostname = doc.location.hostname;
+  var socket = RxWebSocket("ws://" + hostname + ":3001");
 
   var gameInfo = getGameInfo(socket);
 
   var tGameStart = null;
-  var keyInput = Keys.getStream(document)
+  var keyInput = Keys.getStream(doc)
     .combineLatest(gameInfo, (input, game) => {
       var t = Date.now() - game.t;
       tGameStart = game.t;
