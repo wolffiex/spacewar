@@ -82,7 +82,7 @@ function initGame(canvas){
   countdown.subscribe(
     t => { renderInfo.countdown = t},
     () => { console.error('Countdown error')},
-    () => { console.log('ocom'); renderInfo.countdown = null},
+    () => { renderInfo.countdown = null},
   );
 
   GameRenderer = function () {
@@ -168,7 +168,6 @@ function getGameInfo(socket) {
     .map(msg => {
       var now = Date.now();
       var latency = now - msg.d.ping;
-      console.log(latency)
       var pong = msg.d.pong;
 
       return Msg('GO', {
@@ -183,7 +182,6 @@ function getGameInfo(socket) {
   var goMsg = sendGo.merge(recvMsg('GO'));
 
   return player.zip(goMsg, function(k, msg) {
-    console.log('start', msg.d, k, Date.now())
     return {
       k : k,
       t : msg.d[k],
