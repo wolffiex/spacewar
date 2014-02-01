@@ -13,6 +13,7 @@ var xy = Point.xy;
 function initGame(canvas){
   var ctx = canvas.getContext('2d');
 
+  // FIXME: Get URL from document
   var socket = RxWebSocket("ws://localhost:3001");
 
   var gameInfo = getGameInfo(socket);
@@ -172,7 +173,7 @@ function getGameInfo(socket) {
 
       return Msg('GO', {
         a : now + INTRO_TIME,
-        b : Math.round(pong + latency + INTRO_TIME)});
+        b : Math.round(pong + INTRO_TIME - latency)});
     }).share();
 
   // Outbound stream to socket
