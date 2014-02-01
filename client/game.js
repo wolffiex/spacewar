@@ -18,11 +18,9 @@ function initGame(doc, canvas){
 
   var gameInfo = getGameInfo(socket);
 
-  var tGameStart = null;
   var keyInput = Keys.getStream(doc)
     .combineLatest(gameInfo, (input, game) => {
       var t = Date.now() - game.t;
-      tGameStart = game.t;
       if (t<0) return null;
 
       input.t = t;
@@ -36,21 +34,15 @@ function initGame(doc, canvas){
 
   var inputStream = bufferInput(
     keyInput.merge(
-      socket.filter(Msg.filter('INPUT')).map(msg => {
-        var d = msg.d;
-        // FIXME
-        //if (d.t > Date.now() - tGameStart) throw "Lost sync";
-        return d;
-      })));
+      socket.filter(Msg.filter('INPUT')).map(msg => msg.d)));
   
   var timer = new Rx.Subject();
   function updateTimer() {
     timer.onNext(Date.now());
   }
 
-  var gameTime = timer.combineLatest(gameInfo, function(update, game) {
-    return update - game.t;
-  });
+  var gameTime = timer.combineLatest(gameInfo, 
+    (update, game) => update - game.t);
 
   var updater = gameTime
     .filter(t => t >=0 )
