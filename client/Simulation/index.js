@@ -6,51 +6,80 @@ var Ship = require('../Ship');
 var Shots = require('../Shots');
 
 var initialState = require('./initialState');
-var TimeBuffer = require('./TimeBuffer');
 
-function Simulation(inputStream) {
-  var stateBuffer = new TimeBuffer(initialState);
-  return inputStream
-    .map(simulate.bind(null, stateBuffer))
-    .filter(s => !!s);
+var gameList = [{state: initialState, input: null}];
+
+// special case to avoid slow call to splice in
+// the common case
+function fastSplice(list, idx, item) {
+  if (idx == list.length) list.push(item);
+  else list.splice(idx+1, 0, item);
+  return list;
 }
 
-Simulation.initialShips = initialState.ships 
-module.exports = Simulation;
+function mergeInput(_state, input) {
+  var state = deepCopy(_state);
+  state.keys[input.player][input.action] = input.isDown;
 
-function simulate(stateBuffer, input) {
-  if (input.t < 0) return;
-  var isNewAction = !!input.action;
-
-  if (!isNewAction && !stateBuffer.isLast(input.t)) {
-    console.log(input, stateBuffer._last)
-    throw "Received input from the future";
+  // We also account for initial shot when we merge input
+  if (input.action == 'fire' && input.isDown) {
+    var ship = state.ships[input.player];
+    ship.shots = Shots.startFire(ship, input.t);
   }
-    
-  state = stateBuffer.getBefore(input.t);
 
+  return state;
+}
 
-  for (var t = state.t; t < input.t; t++) {
+function Simulation(rawInput, updater) {
+  var simState = rawInput.map(function (input) {
+    var p = gameList.length;
+    while (input.t < gameList[p-1].state.t) {
+      if (--p < 1) throw "Can't find time before " + input.t
+    }
+
+    gameList = fastSplice(gameList, p, {input:input, state: null});
+
+    // now run the simulation forward
+    for (p; p < gameList.length; p++) {
+      var state = deepCopy(gameList[p-1].state);
+      var input = gameList[p].input;
+      state = simulate2(state, input.t);
+      state = mergeInput(state, input);
+
+      gameList[p].state = Object.freeze(state);
+    }
+
+    // NB: gameList never shrinks for now
+    return state
+  });
+
+  var lastRenderState = null;
+  var lastSimState = null;
+  var renderState = simState.combineLatest(updater,
+    function (_state, update) {
+      var state = deepCopy(_state);
+
+      return simulate2(state, update.t);
+    });
+
+  return renderState;
+}
+
+function simulate2 (state, newT) {
+  for (var t = state.t; t <= newT; t++) {
     state.collisions = Shots.tickCollisions(state.collisions);
     state = doPlayerTick('a', state);
     state = doPlayerTick('b', state);
+    state.t = t;
   }
 
-  if (input.action == 'fire' && input.isDown) {
-    var ship = state.ships[input.player];
-    ship.shots = Shots.startFire(ship, t);
-  }
-
-  state.t = input.t;
-  if (input.action) {
-    var keys = state.keys[input.player];
-    keys[input.action] = input.isDown;
-  }
-
-  state = stateBuffer.save(state, !!input.action);
-
-  return input.isUpdate ? state : null;
+  return state;
 }
+
+
+
+Simulation.initialShips = initialState.ships 
+module.exports = Simulation;
 
 function doPlayerTick(player, state) {
   var ship = state.ships[player];

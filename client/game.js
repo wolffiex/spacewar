@@ -51,10 +51,7 @@ function initGame(doc, canvas){
   // Send local input to other player
   keyInput.map(k=>Msg('INPUT', k)).subscribe(socket);
 
-  // All input is buffered to handle out of order arrival
-  var inputStream = bufferInput(
-    keyInput.merge(
-      socket.filter(Msg.filter('INPUT')).map(Msg.value)));
+  var inputStream = keyInput.merge(socket.filter(Msg.filter('INPUT')).map(Msg.value));
   
   var timer = new Rx.Subject();
 
@@ -76,9 +73,7 @@ function initGame(doc, canvas){
 
   var countdown = gameTime.takeUntil(updater).map(t => t * -1);
 
-  //countdown.subscribe(x => console.log('down', x));
-
-  var simulation = Simulation(inputStream.merge(updater));
+  var simulation = Simulation(inputStream, updater);
 
   var renderInfo = {
     startTime: null,
@@ -151,7 +146,7 @@ function draw(ctx, renderInfo) {
 global.initGame = initGame;
 
 
-var INTRO_TIME = 5000;
+var INTRO_TIME = 300;
 function getGameInfo(socket) {
   // INPUT messages are not part of the game setup
   // but this is really just an optimization
@@ -194,35 +189,4 @@ function getGameInfo(socket) {
       t : msg.value[p],
     };
   }).share();
-}
-
-
-function bufferInput(rawInputStream) {
-  var inputBufferList = [{t:0}];
-  return rawInputStream.flatMap(input => {
-    var list = inputBufferList;
-    var ot = _.last(list).t;
-
-    // we need to put this at the last possible spot
-    // e.g. list = {t:0}, {t:1}, {t:1}, {t:3}
-    // and we receive a new {t:1}, it has to go right before t:3
-    var z = list.length;
-    var y = z-1;
-    list.push(input);
-
-    var needsBuffering = false;
-    while(list[y].t > list[z].t) {
-      needsBuffering = true;
-      var tmp = list[z];
-      list[z] = list[y];
-      list[y] = tmp;
-      y--; z--;
-    }
-
-    // TODO: Trim list
-
-    return needsBuffering ?
-      Rx.Observable.fromArray(list.slice(y+1)) :
-      Rx.Observable.returnValue(input);
-  });
 }
