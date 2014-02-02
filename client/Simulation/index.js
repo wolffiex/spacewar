@@ -13,7 +13,7 @@ var gameList = [{state: initialState, input: null}];
 // the common case
 function fastSplice(list, idx, item) {
   if (idx == list.length) list.push(item);
-  else list.splice(idx+1, 0, item);
+  else list.splice(idx, 0, item);
   return list;
 }
 
@@ -43,7 +43,7 @@ function Simulation(rawInput, updater) {
     for (p; p < gameList.length; p++) {
       var state = deepCopy(gameList[p-1].state);
       var input = gameList[p].input;
-      state = simulate2(state, input.t);
+      state = simulate(state, input.t);
       state = mergeInput(state, input);
 
       gameList[p].state = Object.freeze(state);
@@ -53,20 +53,24 @@ function Simulation(rawInput, updater) {
     return state
   });
 
-  var lastRenderState = null;
   var lastSimState = null;
+  var lastRenderState = null;
   var renderState = simState.combineLatest(updater,
     function (_state, update) {
-      var state = deepCopy(_state);
+      var state = (lastSimState == _state) ?
+        lastRenderState :
+        deepCopy(_state);
+      lastSimState = _state;
 
-      return simulate2(state, update.t);
+      lastRenderState = simulate(state, update.t);
+      return lastRenderState;
     });
 
   return renderState;
 }
 
-function simulate2 (state, newT) {
-  for (var t = state.t; t <= newT; t++) {
+function simulate (state, newT) {
+  for (var t = state.t; t < newT; t++) {
     state.collisions = Shots.tickCollisions(state.collisions);
     state = doPlayerTick('a', state);
     state = doPlayerTick('b', state);

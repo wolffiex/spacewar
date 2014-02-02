@@ -20,25 +20,20 @@ function draw(ctx, ship) {
 }
 
 function _draw(ctx, pos, r) {
-  var pts = shipPoly.map(function(pt) {
-    var newPt = Point.rotate(pt, r);
-    // don't make an extra array by calling translatePt
-    newPt.x += pos.x
-    newPt.y += pos.y
-
-    return newPt;
-  });
-
+  ctx.save();
   ctx.beginPath();
 
-  var start = _.last(pts); 
+  var start = _.last(shipPoly); 
+  ctx.translate(pos.x, pos.y);
+  ctx.rotate(r);
   ctx.moveTo(start.x, start.y);
 
-  _.forEach(pts, function(pt) {
+  _.forEach(shipPoly, function(pt) {
     ctx.lineTo(pt.x, pt.y);
   });
 
   ctx.fill();
+  ctx.restore();
 }
 
 var rotSpeed = 0.003;
