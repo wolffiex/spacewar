@@ -26,6 +26,18 @@ function combineKeysAndGame(keysInfo, gameInfo) {
     .share();
 }
 
+function makeRockShape(jags, dist) {
+  var shape = [];
+  var r = Math.PI * 2 /jags;
+  for (var i=0; i < jags; i++) {
+    shape.push(
+      Point.rotate(xy(dist + Math.random() * dist/2, 0), r*i)
+    );
+  }
+
+  return shape;
+}
+
 function initGame(doc, canvas){
   var ctx = canvas.getContext('2d');
 
@@ -41,7 +53,18 @@ function initGame(doc, canvas){
   // Send local input to other player
   keyInput.map(k=>Msg('INPUT', k)).subscribe(socket);
 
-  var inputStream = keyInput.merge(socket.filter(Msg.filter('INPUT')).map(Msg.value));
+  var asteroids = Rx.Observable.fromArray([{
+    type: 'ROCK',
+    pos: xy(200, 200),
+    rot: 1,
+    rotspd: .001,
+    spd: xy(.02, .01),
+    t: 0,
+    shape: makeRockShape(8, 20),
+  }]);
+
+  var inputStream = keyInput.merge(asteroids)
+    .merge(socket.filter(Msg.filter('INPUT')).map(Msg.value));
   
   var timer = new Rx.Subject();
 
@@ -62,11 +85,13 @@ function initGame(doc, canvas){
     ships : Simulation.initialShips,
     collisions : [],
     countdown: null,
+    rocks: [],
   };
 
   simulation.subscribe(state => {
     renderInfo.ships = state.ships;
     renderInfo.collisions = state.collisions;
+    renderInfo.rocks = state.rocks;
   });
 
   countdown.subscribe(
@@ -85,10 +110,13 @@ function initGame(doc, canvas){
 }
 
 function draw(ctx, renderInfo) {
+  ctx.globalAlpha = 1;
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, Point.screenSize.x, Point.screenSize.y);
 
-  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#FFF';
+  if (renderInfo.rocks.length) Ship.drawRocks(ctx, renderInfo.rocks);
+
   ctx.fillStyle = '#0FF';
   Ship.draw(ctx, renderInfo.ships.a);
   ctx.fillStyle = '#F0F';
@@ -101,6 +129,7 @@ function draw(ctx, renderInfo) {
   var shotsB = renderInfo.ships.b.shots;
   ctx.fillStyle = '#F0F';
   if (shotsB.length) Shots.draw(ctx, shotsB);
+
 
   if (renderInfo.collisions.length) {
     Shots.drawCollisions(ctx, renderInfo.collisions);

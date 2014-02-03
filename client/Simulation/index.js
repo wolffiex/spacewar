@@ -17,14 +17,20 @@ function fastSplice(list, idx, item) {
   return list;
 }
 
-function mergeInput(_state, input) {
-  var state = deepCopy(_state);
-  state.keys[input.player][input.action] = input.isDown;
+function mergeInput(state, input) {
+  switch (input.type) {
+    case 'KEY':
+      state.keys[input.player][input.action] = input.isDown;
 
-  // We also account for initial shot when we merge input
-  if (input.action == 'fire' && input.isDown) {
-    var ship = state.ships[input.player];
-    ship.shots = Shots.startFire(ship, input.t);
+      // We also account for initial shot when we merge input
+      if (input.action == 'fire' && input.isDown) {
+        var ship = state.ships[input.player];
+        ship.shots = Shots.startFire(ship, input.t);
+      }
+      break;
+    case 'ROCK':
+      state.rocks.push(input);
+      break;
   }
 
   return state;
@@ -45,6 +51,7 @@ function Simulation(rawInput, updater) {
         var state = deepCopy(gameList[p-1].state);
         var input = gameList[p].input;
         state = simulate(state, input.t);
+
         state = mergeInput(state, input);
 
         gameList[p].state = Object.freeze(state);
@@ -64,6 +71,9 @@ function simulate (state, newT) {
   if (newT < state.t) console.log('backwards')
   for (var t = state.t+1; t < newT; t++) {
     state.collisions = Shots.tickCollisions(state.collisions);
+
+    state.rocks = Ship.tickRocks(state.rocks);
+
     state = doPlayerTick('a', state);
     state = doPlayerTick('b', state);
     state.t = t;
@@ -71,7 +81,6 @@ function simulate (state, newT) {
 
   return state;
 }
-
 
 
 Simulation.initialShips = initialState.ships 

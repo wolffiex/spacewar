@@ -22,6 +22,7 @@ exports.getStream = (doc) => {
 
   function keyMapper(isDown) {
     return keyCode => ({
+      type: 'KEY',
       action: KEY_CODES[keyCode],
       isDown: isDown,
     });

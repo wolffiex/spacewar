@@ -27,5 +27,6 @@ var shipB = {
 };
 
 var ships = {a: shipA, b: shipB}
+var rocks = [];
 
-module.exports = Object.freeze({t, keys, collisions, ships});
+module.exports = Object.freeze({t, keys, collisions, ships, rocks});

@@ -67,7 +67,7 @@ exports.startFire = function(ship) {
 // Mutates ship.shots
 exports.repeatFire = function(ship) {
   var shots = ship.shots;
-  var lastAge = shots.length ? _.last(shots).age : 0;
+  var lastAge = shots.length ? _.last(shots).age : Infinity;
   if (lastAge > SHOTS.delay ) shots = tryFire(ship);
   return shots;
 }
