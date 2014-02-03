@@ -12,16 +12,6 @@ var Msg = require('utils').Msg;
 
 var xy = Point.xy;
 
-/*
-  TODO
-  - Simplify this function
-  - Server replay feature
-  - Backwards feature
-  - Key input opens last n streams of state, use select
-  - Game timer reads key input
-*/
-
-
 function combineKeysAndGame(keysInfo, gameInfo) {
   return keysInfo
     .combineLatest(gameInfo, (input, game) => {
@@ -62,23 +52,16 @@ function initGame(doc, canvas){
   var gameTime = timer.combineLatest(gameInfo, 
     (update, game) => update - game.t);
 
-  var updater = gameTime
-    .filter(t => t >=0 )
-    // scan here is for efficiency, to avoid object creation
-    // in the middle of the render loop
-    .scan({t: null, isUpdate: true}, function(carrier, t) {
-      carrier.t = t;
-      return carrier;
-    });
+  var updater = gameTime.filter(t => t >= 0 );
 
   var countdown = gameTime.takeUntil(updater).map(t => t * -1);
 
   var simulation = Simulation(inputStream, updater);
 
   var renderInfo = {
-    startTime: null,
     ships : Simulation.initialShips,
     collisions : [],
+    countdown: null,
   };
 
   simulation.subscribe(state => {
@@ -104,8 +87,6 @@ function initGame(doc, canvas){
 function draw(ctx, renderInfo) {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, Point.screenSize.x, Point.screenSize.y);
-
-  var startTime = renderInfo.startTime;
 
   ctx.globalAlpha = 1;
   ctx.fillStyle = '#0FF';
@@ -147,6 +128,7 @@ global.initGame = initGame;
 
 
 var INTRO_TIME = 300;
+// This tries to synchronize time between the players
 function getGameInfo(socket) {
   // INPUT messages are not part of the game setup
   // but this is really just an optimization

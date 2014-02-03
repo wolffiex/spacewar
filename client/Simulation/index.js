@@ -55,8 +55,8 @@ function Simulation(rawInput, updater) {
     }));
 
   return snapshot(simState.map(deepCopy), updater,
-    function(state, update) {
-      return simulate(state, update.t);
+    function(state, t) {
+      return simulate(state, t);
     });
 }
 

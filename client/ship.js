@@ -19,14 +19,14 @@ function draw(ctx, ship) {
   }
 }
 
+var DrawStart = _.last(shipPoly); 
 function _draw(ctx, pos, r) {
   ctx.save();
   ctx.beginPath();
 
-  var start = _.last(shipPoly); 
   ctx.translate(pos.x, pos.y);
   ctx.rotate(r);
-  ctx.moveTo(start.x, start.y);
+  ctx.moveTo(DrawStart.x, DrawStart.y);
 
   _.forEach(shipPoly, function(pt) {
     ctx.lineTo(pt.x, pt.y);
