@@ -31,46 +31,38 @@ function mergeInput(_state, input) {
 }
 
 function Simulation(rawInput, updater) {
-  var simState = rawInput.map(function (input) {
-    var p = gameList.length;
-    while (input.t < gameList[p-1].state.t) {
-      if (--p < 1) throw "Can't find time before " + input.t
-    }
+  var simState = Rx.Observable.return(initialState).concat(
+      rawInput.map(function (input) {
+      var p = gameList.length;
+      while (input.t < gameList[p-1].state.t) {
+        if (--p < 1) throw "Can't find time before " + input.t
+      }
 
-    gameList = fastSplice(gameList, p, {input:input, state: null});
+      gameList = fastSplice(gameList, p, {input:input, state: null});
 
-    // now run the simulation forward
-    for (p; p < gameList.length; p++) {
-      var state = deepCopy(gameList[p-1].state);
-      var input = gameList[p].input;
-      state = simulate(state, input.t);
-      state = mergeInput(state, input);
+      // now run the simulation forward
+      for (p; p < gameList.length; p++) {
+        var state = deepCopy(gameList[p-1].state);
+        var input = gameList[p].input;
+        state = simulate(state, input.t);
+        state = mergeInput(state, input);
 
-      gameList[p].state = Object.freeze(state);
-    }
+        gameList[p].state = Object.freeze(state);
+      }
 
-    // NB: gameList never shrinks for now
-    return state
-  });
+      // NB: gameList never shrinks for now
+      return state
+    }));
 
-  var lastSimState = null;
-  var lastRenderState = null;
-  var renderState = simState.combineLatest(updater,
-    function (_state, update) {
-      var state = (lastSimState == _state) ?
-        lastRenderState :
-        deepCopy(_state);
-      lastSimState = _state;
-
-      lastRenderState = simulate(state, update.t);
-      return lastRenderState;
+  return snapshot(simState.map(deepCopy), updater,
+    function(state, update) {
+      return simulate(state, update.t);
     });
-
-  return renderState;
 }
 
 function simulate (state, newT) {
-  for (var t = state.t; t < newT; t++) {
+  if (newT < state.t) console.log('backwards')
+  for (var t = state.t+1; t < newT; t++) {
     state.collisions = Shots.tickCollisions(state.collisions);
     state = doPlayerTick('a', state);
     state = doPlayerTick('b', state);
@@ -124,4 +116,11 @@ function doPlayerTick(player, state) {
 
   state.ships[player] = ship;
   return state;
+}
+
+function snapshot(oCache, oStream, f) {
+  var _cache;
+  oCache.subscribe(c => {_cache = c});
+
+  return oStream.map(stream => f(_cache, stream));
 }
