@@ -132,8 +132,13 @@ function doShotCollisions(state, newCollisions, shots, oShip) {
 }
 
 function snapshot(oCache, oStream, f) {
+  var hasCache = false;
   var _cache;
-  oCache.subscribe(c => {_cache = c});
+  oCache.subscribe(c => {
+    hasCache = true;
+    _cache = c
+  });
 
-  return oStream.map(stream => f(_cache, stream));
+  return oStream.filter(() => hasCache)
+    .map(stream => f(_cache, stream));
 }
