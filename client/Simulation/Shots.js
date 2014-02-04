@@ -6,42 +6,8 @@ var xy = Point.xy;
 var SHOTS = {
   max : 18,
   delay: 400,
-  life: 1600,
   accel: xy(0.2, 0),
 };
-
-// mutates pos
-var PtSSX = Point.screenSize.x;
-var PtSSY = Point.screenSize.y;
-function updatePosWithSpd(pos, spd) {
-  var x = pos.x;
-  var y = pos.y;
-
-  x += spd.x;
-  y += spd.y;
-
-  if (x < 0) x += PtSSX;
-  if (y < 0) y += PtSSY;
-  if (x > PtSSX) x -= PtSSX;
-  if (y > PtSSY) y -= PtSSY;
-
-  pos.x = x;
-  pos.y = y;
-  return pos;
-}
-
-exports.tickShots = function(shots) {
-  var keepAll = true;
-  for (var i=0; i < shots.length; i++) {
-    var shot = shots[i];
-    if (shot.age++ >= SHOTS.life) keepAll = false;
-    shot.pos = updatePosWithSpd(shot.pos, shot.spd);
-  }
-
-  return keepAll ? shots : _.filter(shots, function(shot) {
-    return shot.age < SHOTS.life;
-  });
-}
 
 // Mutates ship.shots
 function tryFire(ship) {
@@ -72,21 +38,23 @@ exports.repeatFire = function(ship) {
   return shots;
 }
 
-// mutates collisions
-var COLLISIONS = {
-  life: 400,
-}
+var boundingRadius = 15;
+var EMPTY_LIST = [];
+exports.shipCollisions = function(ship, shots) {
+  // For now, let's pretend shots have no dimension,
+  // they're just a point
 
-exports.tickCollisions = function (collisions) {
-  var keepAll = true;
-  for (var i=0; i < collisions.length; i++) {
-    var c = collisions[i];
-    if (++c.age > COLLISIONS.life) keepAll = false;
-    c.pos = updatePosWithSpd(c.pos, c.spd);
+  var collisions = EMPTY_LIST;
+  for (var i=0; i < shots.length; i++) {
+    var shot = shots[i];
+    // First check bounding box
+    if (Math.abs(ship.pos.x - shot.pos.x) < boundingRadius) {
+      if (Math.abs(ship.pos.y - shot.pos.y) < boundingRadius) {
+        // Now need to do detailed check
+        collisions = collisions.concat(i);
+      }
+    }
   }
 
-  return keepAll ? collisions : _.filter(collisions, function(c) {
-    return c.age < COLLISIONS.life;
-  });
-
+  return collisions;
 }

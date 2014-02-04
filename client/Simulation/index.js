@@ -2,8 +2,8 @@ var Rx = require('Rx');
 var _ = require('underscore');
 var deepCopy = require('utils').deepCopy;
 
-var Ship = require('./Ship');
 var Shots = require('./Shots');
+var Tick = require('./Tick');
 
 var initialState = require('./initialState');
 
@@ -70,9 +70,9 @@ function Simulation(rawInput, updater) {
 function simulate (state, newT) {
   if (newT < state.t) console.log('backwards')
   for (var t = state.t+1; t < newT; t++) {
-    state.collisions = Shots.tickCollisions(state.collisions);
+    state.collisions = Tick.collisions(state.collisions);
 
-    state.rocks = Ship.tickRocks(state.rocks);
+    state.rocks = Tick.rocks(state.rocks);
 
     state = doPlayerTick('a', state);
     state = doPlayerTick('b', state);
@@ -92,14 +92,14 @@ function doPlayerTick(player, state) {
 
   var oShip = state.ships[player == 'a' ? 'b' : 'a'];
 
-  ship = Ship.inputTick(ship, keys);
-  ship.shots = Shots.tickShots(ship.shots);
+  ship = Tick.ship(ship, keys);
+  ship.shots = Tick.shots(ship.shots);
 
   if (keys.fire) {
     ship.shots = Shots.repeatFire(ship);
   }
 
-  var newCollisions = Ship.checkShots(oShip, ship.shots);
+  var newCollisions = Shots.shipCollisions(oShip, ship.shots);
 
   if (newCollisions.length) {
     var {collisions, shots} = 
@@ -119,7 +119,7 @@ function doShotCollisions(state, newCollisions, shots, oShip) {
     oShip.spd.x += collision.spd.x/8;
     oShip.spd.y += collision.spd.y/8;
 
-    oShip.spd = Ship.limitSpeed(oShip.spd);
+    oShip.spd = Tick.limitShipSpeed(oShip.spd);
 
     collision.age = 0;
     collision.spd.x = oShip.spd.x;
