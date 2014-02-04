@@ -1,5 +1,5 @@
-var Point = require('./Point');
-var Ship = require('./Ship');
+var Point = require('../Point');
+var Shapes = require('../Shapes');
 var _ = require('underscore');
 var xy = Point.xy;
 
@@ -50,7 +50,7 @@ function tryFire(ship) {
     var r = ship.rot;
     var shot = {
       age : 0,
-      pos : Point.translate(ship.pos, Point.rotate(Ship.nose, r)),
+      pos : Point.translate(ship.pos, Point.rotate(Shapes.shipNose, r)),
       spd : Point.translate(ship.spd, Point.rotate(SHOTS.accel, r)),
     };
     shots.push(shot);
@@ -72,18 +72,6 @@ exports.repeatFire = function(ship) {
   return shots;
 }
 
-exports.draw = function(ctx, shotList) {
-  shotList.forEach(function(shot) {
-    var x = shot.pos.x;
-    var y = shot.pos.y;
-
-    ctx.beginPath();
-    ctx.arc(x, y, 2, 0, Math.PI*2, true); 
-    ctx.closePath();
-    ctx.fill();
-  });
-}
-
 // mutates collisions
 var COLLISIONS = {
   life: 400,
@@ -93,7 +81,7 @@ exports.tickCollisions = function (collisions) {
   var keepAll = true;
   for (var i=0; i < collisions.length; i++) {
     var c = collisions[i];
-    if (c.age++ >= COLLISIONS.life) keepAll = false;
+    if (++c.age > COLLISIONS.life) keepAll = false;
     c.pos = updatePosWithSpd(c.pos, c.spd);
   }
 
@@ -101,22 +89,4 @@ exports.tickCollisions = function (collisions) {
     return c.age < COLLISIONS.life;
   });
 
-}
-
-exports.drawCollisions = function(ctx, collisions) {
-  ctx.fillStyle = '#FFA500';
-  collisions.forEach(function(c) {
-    var x = c.pos.x;
-    var y = c.pos.y;
-
-    var p = c.age/COLLISIONS.life;
-
-    ctx.globalAlpha = 1-p;
-    ctx.beginPath();
-    ctx.arc(x, y, p*50, 0, Math.PI*2, true); 
-    ctx.closePath();
-    ctx.fill();
-  });
-
-  ctx.globalAlpha = 1;
 }

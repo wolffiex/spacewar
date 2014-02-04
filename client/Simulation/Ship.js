@@ -1,46 +1,6 @@
-var Point = require('./Point');
+var Point = require('../Point');
 var _ = require('underscore');
 var xy = Point.xy;
-
-var shipPoly = [
-  xy( 15,  0),
-  xy(-15, 10),
-  xy( -4,  0),
-  xy(-15,-10),
-];
-
-
-function draw(ctx, ship) {
-  _draw(ctx, ship.pos, ship.rot);
-  var otherSide = Point.foldOnScreen(ship.pos);
-
-  if (otherSide) {
-    _draw(ctx, otherSide, ship.rot);
-  }
-}
-
-function _draw(ctx, pos, r) {
-  ctx.save();
-
-
-  ctx.translate(pos.x, pos.y);
-  ctx.rotate(r);
-
-  ctx.beginPath();
-  drawShape(ctx, shipPoly);
-  ctx.fill();
-
-  ctx.restore();
-}
-
-function drawShape(ctx, shape) {
-  var start = _.last(shape); 
-  ctx.moveTo(start.x, start.y);
-
-  _.forEach(shape, function(pt) {
-    ctx.lineTo(pt.x, pt.y);
-  });
-}
 
 var rotSpeed = 0.003;
 var thrustAccel = xy(0.0004, 0);
@@ -99,8 +59,6 @@ function limitSpeed(spd) {
 }
 
 exports.limitSpeed = limitSpeed;
-exports.nose = shipPoly[0];
-exports.draw = draw;
 
 var boundingRadius = 15;
 var EMPTY_LIST = [];
@@ -125,31 +83,6 @@ exports.checkShots = function(ship, shots) {
   return collisions;
 }
 
-exports.drawRocks = function(ctx, rocks) {
-  ctx.save();
-  ctx.strokeStyle = '#FFF'
-  ctx.lineWidth = 1;
-  rocks.forEach(rock => {
-    _drawRock(ctx, rock, rock.pos);
-    var otherSide = Point.foldOnScreen(rock.pos);
-
-    if (otherSide) {
-      _drawRock(ctx, rock, otherSide);
-    }
-
-  });
-
-  ctx.restore();
-}
-
-function _drawRock(ctx, rock, pos) {
-  ctx.translate(pos.x, pos.y);
-  ctx.rotate(rock.rot);
-  ctx.beginPath();
-  drawShape(ctx, rock.shape);
-  ctx.stroke();
-}
-
 exports.tickRocks = function(rocks) {
   rocks.forEach(rock => {
     var pos = rock.pos;
@@ -165,4 +98,3 @@ exports.tickRocks = function(rocks) {
 
   return rocks;
 }
-

@@ -2,8 +2,8 @@ var Rx = require('Rx');
 var _ = require('underscore');
 var deepCopy = require('utils').deepCopy;
 
-var Ship = require('../Ship');
-var Shots = require('../Shots');
+var Ship = require('./Ship');
+var Shots = require('./Shots');
 
 var initialState = require('./initialState');
 
@@ -102,29 +102,33 @@ function doPlayerTick(player, state) {
   var newCollisions = Ship.checkShots(oShip, ship.shots);
 
   if (newCollisions.length) {
-    // this mutates shipA.shots
-    var shots = ship.shots;
-
-    _.each(newCollisions, function(shotIndex) {
-      var collision = shots[shotIndex];
-      shots[shotIndex] = null;
-      oShip.spd.x += collision.spd.x/8;
-      oShip.spd.y += collision.spd.y/8;
-
-      oShip.spd = Ship.limitSpeed(oShip.spd);
-
-      collision.age = 0;
-      collision.spd.x = oShip.spd.x;
-      collision.spd.y = oShip.spd.y;
-
-      state.collisions = state.collisions.concat(collision);
-    });
-
-    ship.shots = _.compact(shots);
+    var {collisions, shots} = 
+      doShotCollisions(state, newCollisions, ship.shots, oShip);
+    state.collisions = collisions;
+    ship.shots = shots;
   }
 
   state.ships[player] = ship;
   return state;
+}
+
+function doShotCollisions(state, newCollisions, shots, oShip) {
+  var collisions = state.collisions.concat(_.map(newCollisions, shotIndex => {
+    var collision = shots[shotIndex];
+    shots[shotIndex] = null;
+    oShip.spd.x += collision.spd.x/8;
+    oShip.spd.y += collision.spd.y/8;
+
+    oShip.spd = Ship.limitSpeed(oShip.spd);
+
+    collision.age = 0;
+    collision.spd.x = oShip.spd.x;
+    collision.spd.y = oShip.spd.y;
+    return collision;
+  }));
+
+  shots = _.compact(shots);
+  return {collisions, shots};
 }
 
 function snapshot(oCache, oStream, f) {

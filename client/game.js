@@ -2,10 +2,9 @@ var Rx = require('Rx');
 var _ = require('underscore');
 
 var RxWebSocket = require('RxWebSocket');
-var Ship = require('./Ship');
+var Draw = require('./Draw');
 var Point = require('./Point');
 var Keys = require('./Keys');
-var Shots = require('./Shots');
 var Simulation = require('./Simulation');
 var notEmpty = require('utils').notEmpty;
 var Msg = require('utils').Msg;
@@ -115,24 +114,24 @@ function draw(ctx, renderInfo) {
   ctx.fillRect(0, 0, Point.screenSize.x, Point.screenSize.y);
 
   ctx.fillStyle = '#FFF';
-  if (renderInfo.rocks.length) Ship.drawRocks(ctx, renderInfo.rocks);
+  if (renderInfo.rocks.length) Draw.rocks(ctx, renderInfo.rocks);
 
   ctx.fillStyle = '#0FF';
-  Ship.draw(ctx, renderInfo.ships.a);
+  Draw.ship(ctx, renderInfo.ships.a);
   ctx.fillStyle = '#F0F';
-  Ship.draw(ctx, renderInfo.ships.b);
+  Draw.ship(ctx, renderInfo.ships.b);
 
   ctx.fillStyle = '#0FF';
   var shotsA = renderInfo.ships.a.shots;
-  if (shotsA.length) Shots.draw(ctx, shotsA);
+  if (shotsA.length) Draw.shots(ctx, shotsA);
 
   var shotsB = renderInfo.ships.b.shots;
   ctx.fillStyle = '#F0F';
-  if (shotsB.length) Shots.draw(ctx, shotsB);
+  if (shotsB.length) Draw.shots(ctx, shotsB);
 
 
   if (renderInfo.collisions.length) {
-    Shots.drawCollisions(ctx, renderInfo.collisions);
+    Draw.collisions(ctx, renderInfo.collisions);
   }
 
   if (renderInfo.countdown != null) {
