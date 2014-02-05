@@ -3,9 +3,9 @@ digraph G {
 
   subgraph clusterGame {
     start;
-    gameInfo->simulation;
-    input->simulation;
-    simulation->renderState;
+    gameInfo->gameState;
+    input->gameState;
+    gameState->renderState;
     renderState->end;
     
     requestAnimationFrame->renderTimeout;
@@ -17,22 +17,34 @@ digraph G {
     renderTimeout [label="timeout", shape=invhouse];
     requestAnimationFrame [shape=invhouse];
     render [shape=hexagon];
+    gameState [label="game state"];
+    renderState [label="render state"];
 
-    subgraph clusterPlayerB {
-      pong->go_b [style="invis"];
-      go_b [label="go"];
-      label = "Player B";
-    }
-
-    subgraph clusterPlayerA {
+    subgraph clusterSocketA {
       ping->go [style="invis"];
-      label = "Player A";
+      go->inputA;
+      inputA [label="input"];
+      label = "Socket A";
     }
+
+    subgraph clusterSocketB {
+      pong->go_b [style="invis"];
+      go_b->inputB;
+      go_b [label="go"];
+      inputB [label="input"];
+      label = "Socket B";
+    }
+
 
   }
 
-  start->ping [lhead=clusterPlayerA];
-  start->pong [lhead=clusterPlayerB];
+  inputA->inputB;
+  inputB->inputA;
+  inputA->input;
+  inputB->input;
+
+  start->ping [lhead=clusterSocketA];
+  start->pong [lhead=clusterSocketB];
 
   ping->pong [weight=0];
   pong->go [weight=0];
