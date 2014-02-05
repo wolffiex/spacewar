@@ -5,6 +5,7 @@ var RxWebSocket = require('RxWebSocket');
 var Draw = require('./Draw');
 var Point = require('./Point');
 var Keys = require('./Keys');
+var Shapes = require('./Shapes');
 var Simulation = require('./Simulation');
 var notEmpty = require('utils').notEmpty;
 var Msg = require('utils').Msg;
@@ -23,18 +24,6 @@ function combineKeysAndGame(keysInfo, gameInfo) {
     })
     .filter(notEmpty)
     .share();
-}
-
-function makeRockShape(jags, dist) {
-  var shape = [];
-  var r = Math.PI * 2 /jags;
-  for (var i=0; i < jags; i++) {
-    shape.push(
-      Point.rotate(xy(dist + Math.random() * dist/2, 0), r*i)
-    );
-  }
-
-  return shape;
 }
 
 function initGame(doc, canvas){
@@ -59,7 +48,7 @@ function initGame(doc, canvas){
     rotspd: .001,
     spd: xy(.02, .01),
     t: 0,
-    shape: makeRockShape(8, 20),
+    shape: Shapes.makeRock(8, 20),
   }]);
 
   var inputStream = keyInput.merge(asteroids)
