@@ -1,0 +1,53 @@
+digraph G {
+  compound=true;
+
+  subgraph clusterGame {
+    start;
+    gameInfo->simulation;
+    input->simulation;
+    simulation->renderState;
+    renderState->end;
+    
+    requestAnimationFrame->renderTimeout;
+    requestAnimationFrame->render;
+    renderTimeout->renderState;
+    renderState->render;
+    label = "Game";
+
+    renderTimeout [label="timeout", shape=invhouse];
+    requestAnimationFrame [shape=invhouse];
+    render [shape=hexagon];
+
+    subgraph clusterPlayerB {
+      pong->go_b [style="invis"];
+      go_b [label="go"];
+      label = "Player B";
+    }
+
+    subgraph clusterPlayerA {
+      ping->go [style="invis"];
+      label = "Player A";
+    }
+
+  }
+
+  start->ping [lhead=clusterPlayerA];
+  start->pong [lhead=clusterPlayerB];
+
+  ping->pong [weight=0];
+  pong->go [weight=0];
+  go->go_b [weight=0];
+
+  go->gameInfo;
+  go_b->gameInfo;
+
+  sockets -> start [label="buffer 2"];
+  end -> log [label="mergeAll"];
+  //a -> b [label="hello", style=dashed];
+  //a -> c [label="world"];
+  //c -> d; b -> c; d -> a;
+  //b [shape=Mdiamond, label="this is b"];
+  //c [shape=polygon, sides=5, peripheries=3];
+  //d [style=bold];
+}
+
