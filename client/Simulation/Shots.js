@@ -38,18 +38,39 @@ exports.repeatFire = function(ship) {
   return shots;
 }
 
-var boundingRadius = 15;
-var EMPTY_LIST = [];
+var shipBoundingRadius = 15;
 exports.shipCollisions = function(ship, shots) {
-  // For now, let's pretend shots have no dimension,
-  // they're just a point
+  return getShotCollisions(shots, ship.pos, Shapes.ship, shipBoundingRadius);
+}
 
+exports.rockCollisions = function(shots, rocks) {
+  var collisions = EMPTY_LIST;
+  for (var i=0; i < rocks.length; i++) {
+    var rock = rocks[i];
+    var nextCollisions = getShotCollisions(shots, rock.pos, rock.shape, 15);
+    if (nextCollisions.length) {
+      collisions = collisions.concat(
+        _.map(nextCollisions, (idx) => ({
+          rock: i,
+          shot: idx,
+        }))
+      );
+    }
+  }
+  return collisions;
+}
+
+var EMPTY_LIST = [];
+// For now, let's pretend shots have no dimension,
+// they're just a point
+function getShotCollisions(shots, pos, shape, bounding) {
   var collisions = EMPTY_LIST;
   for (var i=0; i < shots.length; i++) {
     var shot = shots[i];
+
     // First check bounding box
-    if (Math.abs(ship.pos.x - shot.pos.x) < boundingRadius) {
-      if (Math.abs(ship.pos.y - shot.pos.y) < boundingRadius) {
+    if (Math.abs(pos.x - shot.pos.x) < bounding) {
+      if (Math.abs(pos.y - shot.pos.y) < bounding) {
         // Now need to do detailed check
         collisions = collisions.concat(i);
       }
@@ -57,4 +78,65 @@ exports.shipCollisions = function(ship, shots) {
   }
 
   return collisions;
+}
+
+var MAXROCKS = 9;
+exports.getRockStream = function(simulation) {
+  return simulation.sample(2500)
+    .filter(state => Math.random() < (MAXROCKS-state.rocks.length)/MAXROCKS)
+    .map(() => generateRock(0, xy(
+      Math.random() * Point.screenSize.x,
+      Math.random() * Point.screenSize.y)));
+}
+
+var ROCK_TYPES = [
+  {
+    maxRot : 0.002,
+    accel : xy(0.03, 0),
+    radius: 20,
+    sides: 10,
+  },
+  {
+    maxRot : 0.004,
+    accel : xy(0.05, 0),
+    radius: 10,
+    sides: 8,
+  },
+  {
+    maxRot : 0.006,
+    accel : xy(0.07, 0),
+    radius: 4,
+    sides: 6,
+  },
+];
+
+function generateRock(type, pos) {
+  var ROCKTYPE = ROCK_TYPES[type];
+
+  var rotspd = ROCKTYPE.maxRot * 2 * Math.random() - ROCKTYPE.maxRot;
+  var spd = Point.rotate(ROCKTYPE.accel, Math.random() * 2 * Math.PI);
+  var radius = ROCKTYPE.radius;
+
+  return {
+    type: 'ROCK',
+    rocktype: type,
+    pos,
+    spd,
+    rot: 0,
+    rotspd,
+    radius,
+    shape: Shapes.makeRock(ROCKTYPE.sides, radius),
+  };
+}
+
+exports.splitRock = function(rock) {
+  var pos = rock.pos;
+  switch(rock.rocktype) {
+    case 0:
+      return [generateRock(2, pos), generateRock(1, pos)];
+    case 1:
+      return [generateRock(2, pos), generateRock(2, pos)];
+    default:
+      return EMPTY_LIST;
+  }
 }

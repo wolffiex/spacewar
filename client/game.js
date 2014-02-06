@@ -10,8 +10,6 @@ var Simulation = require('./Simulation');
 var notEmpty = require('utils').notEmpty;
 var Msg = require('utils').Msg;
 
-var xy = Point.xy;
-
 function combineKeysAndGame(keysInfo, game) {
   return keysInfo.map((input) => {
       var t = Date.now() - game.t;
@@ -78,7 +76,7 @@ function initGame(doc, canvas){
     var simulation = Simulation(inputStream, updater);
 
     if (game.player == 'a') {
-      getRockStream(simulation).subscribe(rockSubject);
+      Simulation.getRockStream(simulation).subscribe(rockSubject);
     }
 
     simulation.subscribe(state => {
@@ -97,8 +95,6 @@ function initGame(doc, canvas){
     // Send local input to other player
     return keyInput.map(k=>Msg('INPUT', k));
   }).subscribe(socket);
-
-
 }
 
 function draw(ctx, renderInfo) {
@@ -145,24 +141,10 @@ function draw(ctx, renderInfo) {
   }
 }
 
-function getRockStream(simulation) {
-  return simulation.sample(2500)
-    .filter(state => Math.random() < (10-state.rocks.length)/10)
-    .map(state => {
-    return {
-      type: 'ROCK',
-      pos: xy(300, 300),
-      rot: 1,
-      rotspd: .001,
-      spd: xy(.02, .01),
-      shape: Shapes.makeRock(8, 20),
-    }});
-}
-
 global.initGame = initGame;
 
 
-var INTRO_TIME = 600;
+var INTRO_TIME = 500;
 // This tries to synchronize time between the players
 function getGameInfo(socket) {
   // INPUT messages are not part of the game setup

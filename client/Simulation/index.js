@@ -29,7 +29,7 @@ function mergeInput(state, input) {
       }
       break;
     case 'ROCK':
-      state.rocks.push(input);
+      state.rocks.push(deepCopy(input));
       break;
   }
 
@@ -57,7 +57,9 @@ function Simulation(rawInput, updater) {
         gameList[p].state = Object.freeze(state);
       }
 
-      // NB: gameList never shrinks for now
+      if (gameList.length > 60) {
+        gameList = gameList.slice(30);
+      }
       return state
     }));
 
@@ -68,7 +70,8 @@ function Simulation(rawInput, updater) {
 }
 
 function simulate (state, newT) {
-  if (newT < state.t) console.log('backwards')
+  if (newT < state.t) console.log('backwards', state.t - newT);
+
   for (var t = state.t+1; t < newT; t++) {
     state.collisions = Tick.collisions(state.collisions);
 
@@ -84,6 +87,8 @@ function simulate (state, newT) {
 
 
 Simulation.initialShips = initialState.ships 
+
+Simulation.getRockStream = Shots.getRockStream;
 module.exports = Simulation;
 
 function doPlayerTick(player, state) {
@@ -102,33 +107,58 @@ function doPlayerTick(player, state) {
   var newCollisions = Shots.shipCollisions(oShip, ship.shots);
 
   if (newCollisions.length) {
-    var {collisions, shots} = 
-      doShotCollisions(state, newCollisions, ship.shots, oShip);
-    state.collisions = collisions;
-    ship.shots = shots;
+    state.collisions = state.collisions.concat(
+      doShotCollisions(oShip, ship.shots, newCollisions));
+    ship.shots = removeCollidedShots(ship.shots, newCollisions);
+  }
+
+  var newRockCollisions = Shots.rockCollisions(ship.shots, state.rocks);
+  if (newRockCollisions.length) {
+    state.rocks = replaceCollidedRocks(
+      state.rocks, _.pluck(newRockCollisions, 'rock'));
+    ship.shots = removeCollidedShots(
+      ship.shots, _.pluck(newRockCollisions, 'shot'));
   }
 
   state.ships[player] = ship;
   return state;
 }
 
-function doShotCollisions(state, newCollisions, shots, oShip) {
-  var collisions = state.collisions.concat(_.map(newCollisions, shotIndex => {
+function doShotCollisions(oShip, shots, newCollisions) {
+  return _.map(newCollisions, (shotIndex) => {
     var collision = shots[shotIndex];
-    shots[shotIndex] = null;
+
+    // TODO: Factor out side effects here
     oShip.spd.x += collision.spd.x/8;
     oShip.spd.y += collision.spd.y/8;
-
     oShip.spd = Tick.limitShipSpeed(oShip.spd);
 
     collision.age = 0;
     collision.spd.x = oShip.spd.x;
     collision.spd.y = oShip.spd.y;
     return collision;
-  }));
+  });
 
-  shots = _.compact(shots);
-  return {collisions, shots};
+}
+
+function replaceCollidedRocks(_rocks, collisions) {
+  var rocks = _rocks;
+  collisions.forEach(function (rockIndex) {
+    var rock = rocks[rockIndex];
+    rocks[rockIndex] = null;
+
+    rocks = rocks.concat(Shots.splitRock(rock));
+  });
+
+  return _.compact(rocks);
+}
+
+function removeCollidedShots(shots, collisions) {
+  collisions.forEach(function (shotIndex) {
+    shots[shotIndex] = null;
+  });
+
+  return _.compact(shots);
 }
 
 function snapshot(oCache, oStream, f) {
