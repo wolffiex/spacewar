@@ -33,6 +33,7 @@ function initGame(doc, canvas){
   var socket = RxWebSocket("ws://" + hostname + ":3001");
 
   // Game start and player info
+  // TODO: Maybe this should be "game" and be a closure
   var gameInfo = getGameInfo(socket);
 
   // Mark key input with player and relative game time
@@ -41,18 +42,12 @@ function initGame(doc, canvas){
   // Send local input to other player
   keyInput.map(k=>Msg('INPUT', k)).subscribe(socket);
 
-  var asteroids = Rx.Observable.fromArray([{
-    type: 'ROCK',
-    pos: xy(200, 200),
-    rot: 1,
-    rotspd: .001,
-    spd: xy(.02, .01),
-    t: 0,
-    shape: Shapes.makeRock(8, 20),
-  }]);
+  
+  var rockSubject = new Rx.Subject();
 
-  var inputStream = keyInput.merge(asteroids)
-    .merge(socket.filter(Msg.filter('INPUT')).map(Msg.value));
+  var inputStream = keyInput
+    .merge(socket.filter(Msg.filter('INPUT')).map(Msg.value))
+    .merge(rockSubject);
   
   var timer = new Rx.Subject();
 
@@ -68,6 +63,8 @@ function initGame(doc, canvas){
   var countdown = gameTime.takeUntil(updater).map(t => t * -1);
 
   var simulation = Simulation(inputStream, updater);
+
+  getRockStream(gameInfo, simulation, socket).subscribe(rockSubject);
 
   var renderInfo = {
     ships : Simulation.initialShips,
@@ -139,6 +136,29 @@ function draw(ctx, renderInfo) {
     ctx.font=fontSize + "px Courier";
     ctx.fillText(tSecInt+1, 200, 200);
   }
+}
+
+function getRockStream(gameInfo, simulation, socket) {
+  return gameInfo.flatMap(function (game) {
+    if (game.player == 'a') {
+      // Player a makes rocks
+      var stream = Rx.Observable.fromArray([{
+        type: 'ROCK',
+        pos: xy(300, 300),
+        rot: 1,
+        rotspd: .001,
+        spd: xy(.02, .01),
+        t: 0,
+        shape: Shapes.makeRock(8, 20),
+      }]);
+
+      return stream
+
+    } else {
+      // Player b receives rocks
+      return Rx.Observable.empty();
+    }
+  });
 }
 
 global.initGame = initGame;
