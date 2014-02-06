@@ -38,6 +38,8 @@ function loopback(connection) {
     connection.map(function(msg) {
       // Don't allow game to start twice
       if (msg.key == 'GO') return null;
+      if (msg.key == 'INPUT' && msg.value.type =='ROCK') return null;
+
       var copy = utils.deepCopy(msg);
       if (copy.key == 'INPUT') {
         copy.value.player = msg.value.player == 'a' ? 'b' : 'a';

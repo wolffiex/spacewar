@@ -1,6 +1,7 @@
 var Point = require('../Point');
 var Shapes = require('../Shapes');
 var _ = require('underscore');
+var deepCopy = require('utils').deepCopy;
 var xy = Point.xy;
 
 var SHOTS = {
@@ -45,16 +46,19 @@ exports.shipCollisions = function(ship, shots) {
 
 exports.rockCollisions = function(shots, rocks) {
   var collisions = EMPTY_LIST;
-  for (var i=0; i < rocks.length; i++) {
-    var rock = rocks[i];
-    var nextCollisions = getShotCollisions(shots, rock.pos, rock.shape, 15);
-    if (nextCollisions.length) {
-      collisions = collisions.concat(
-        _.map(nextCollisions, (idx) => ({
-          rock: i,
-          shot: idx,
-        }))
-      );
+  if (shots.length) {
+    for (var i=0; i < rocks.length; i++) {
+      var rock = rocks[i];
+      var nextCollisions = getShotCollisions(shots, rock.pos, rock.shape, 15);
+      if (nextCollisions.length) {
+        console.log('here', nextCollisions, collisions, i);
+        collisions = collisions.concat(
+          _.map(nextCollisions, (idx) => ({
+            rock: i,
+            shot: idx,
+          }))
+        );
+      }
     }
   }
   return collisions;
@@ -80,7 +84,7 @@ function getShotCollisions(shots, pos, shape, bounding) {
   return collisions;
 }
 
-var MAXROCKS = 9;
+var MAXROCKS = 4;
 exports.getRockStream = function(simulation) {
   return simulation.sample(2500)
     .filter(state => Math.random() < (MAXROCKS-state.rocks.length)/MAXROCKS)
@@ -130,12 +134,12 @@ function generateRock(rocktype, pos) {
 }
 
 exports.splitRock = function(rock) {
-  var pos = rock.pos;
+  var pos = () => deepCopy(rock.pos);
   switch(rock.rocktype) {
     case 0:
-      return [generateRock(2, pos), generateRock(1, pos)];
+      return [generateRock(2, pos()), generateRock(1, pos())];
     case 1:
-      return [generateRock(2, pos), generateRock(2, pos)];
+      return [generateRock(2, pos()), generateRock(2, pos())];
     default:
       return EMPTY_LIST;
   }
