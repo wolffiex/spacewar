@@ -39,29 +39,29 @@ function mergeInput(state, input) {
 function Simulation(rawInput, updater) {
   var simState = Rx.Observable.return(initialState).concat(
       rawInput.map(function (input) {
-      var p = gameList.length;
-      while (input.t < gameList[p-1].state.t) {
-        if (--p < 1) throw "Can't find time before " + input.t
-      }
+        var p = gameList.length;
+        while (input.t < gameList[p-1].state.t) {
+          if (--p < 1) throw "Can't find time before " + input.t
+        }
 
-      gameList = fastSplice(gameList, p, {input:input, state: null});
+        gameList = fastSplice(gameList, p, {input:input, state: null});
 
-      // now run the simulation forward
-      for (p; p < gameList.length; p++) {
-        var state = deepCopy(gameList[p-1].state);
-        var input = gameList[p].input;
-        state = simulate(state, input.t);
+        // now run the simulation forward
+        for (p; p < gameList.length; p++) {
+          var state = deepCopy(gameList[p-1].state);
+          var input = gameList[p].input;
+          state = simulate(state, input.t);
 
-        state = mergeInput(state, input);
+          state = mergeInput(state, input);
 
-        gameList[p].state = Object.freeze(state);
-      }
+          gameList[p].state = Object.freeze(state);
+        }
 
-      if (gameList.length > 60) {
-        gameList = gameList.slice(30);
-      }
-      return state
-    }));
+        if (gameList.length > 60) {
+          gameList = gameList.slice(30);
+        }
+        return state
+      }));
 
   return snapshot(simState.map(deepCopy), updater,
     function(state, t) {
@@ -75,10 +75,10 @@ function simulate (state, newT) {
   for (var t = state.t+1; t < newT; t++) {
     state.collisions = Tick.collisions(state.collisions);
 
-    state.rocks = Tick.rocks(state.rocks);
-
     state = doPlayerTick('a', state);
     state = doPlayerTick('b', state);
+    state.rocks = Tick.rocks(state.rocks);
+
     state.t = t;
   }
 

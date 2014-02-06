@@ -110,8 +110,8 @@ var ROCK_TYPES = [
   },
 ];
 
-function generateRock(type, pos) {
-  var ROCKTYPE = ROCK_TYPES[type];
+function generateRock(rocktype, pos) {
+  var ROCKTYPE = ROCK_TYPES[rocktype];
 
   var rotspd = ROCKTYPE.maxRot * 2 * Math.random() - ROCKTYPE.maxRot;
   var spd = Point.rotate(ROCKTYPE.accel, Math.random() * 2 * Math.PI);
@@ -119,7 +119,7 @@ function generateRock(type, pos) {
 
   return {
     type: 'ROCK',
-    rocktype: type,
+    rocktype,
     pos,
     spd,
     rot: 0,
