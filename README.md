@@ -1,6 +1,6 @@
 #Rx Spacewar
 
-**Rx Spacewar** is a two player network arcade game in the category of low friction games like the original [Spacewar!](http://en.wikipedia.org/wiki/Spacewar_(video_game\)), [Asteroids](http://en.wikipedia.org/wiki/Asteroids_(video_game\)), and [Maelstrom](http://en.wikipedia.org/wiki/Maelstrom_(1992_video_game\)).
+**Rx Spacewar** is a two player network arcade game in the category of low friction games like the original [Spacewar!](http://en.wikipedia.org/wiki/Spacewar_(video_game)), [Asteroids](http://en.wikipedia.org/wiki/Asteroids_(video_game)), and [Maelstrom](http://en.wikipedia.org/wiki/Maelstrom_(1992_video_game)).
 
 Its implementation is an experiment in applying the principles of reactive programming to make a fault tolerant distributed system that is eventually consistent.
 
