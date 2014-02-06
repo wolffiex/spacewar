@@ -2,7 +2,8 @@ var Rx = require('Rx');
 var _ = require('underscore');
 var deepCopy = require('utils').deepCopy;
 
-var Shots = require('./Shots');
+var Collisions = require('./Collisions');
+var Fire = require('./Fire');
 var Tick = require('./Tick');
 
 var initialState = require('./initialState');
@@ -25,7 +26,7 @@ function mergeInput(state, input) {
       // We also account for initial shot when we merge input
       if (input.action == 'fire' && input.isDown) {
         var ship = state.ships[input.player];
-        ship.shots = Shots.startFire(ship, input.t);
+        ship.shots = Fire.start(ship, input.t);
       }
       break;
     case 'ROCK':
@@ -88,7 +89,7 @@ function simulate (state, newT) {
 
 Simulation.initialShips = initialState.ships 
 
-Simulation.getRockStream = Shots.getRockStream;
+Simulation.getRockStream = Collisions.getRockStream;
 module.exports = Simulation;
 
 function doPlayerTick(player, state) {
@@ -101,10 +102,10 @@ function doPlayerTick(player, state) {
   ship.shots = Tick.shots(ship.shots);
 
   if (keys.fire) {
-    ship.shots = Shots.repeatFire(ship);
+    ship.shots = Fire.repeat(ship);
   }
 
-  var newCollisions = Shots.shipCollisions(oShip, ship.shots);
+  var newCollisions = Collisions.shipCollisions(oShip, ship.shots);
 
   if (newCollisions.length) {
     state.collisions = state.collisions.concat(
@@ -112,7 +113,7 @@ function doPlayerTick(player, state) {
     ship.shots = removeCollidedShots(ship.shots, newCollisions);
   }
 
-  var newRockCollisions = Shots.rockCollisions(ship.shots, state.rocks);
+  var newRockCollisions = Collisions.rockCollisions(ship.shots, state.rocks);
   if (newRockCollisions.length) {
     state.rocks = replaceCollidedRocks(
       state.rocks, _.pluck(newRockCollisions, 'rock'));
@@ -147,7 +148,7 @@ function replaceCollidedRocks(_rocks, collisions) {
     var rock = rocks[rockIndex];
     rocks[rockIndex] = null;
 
-    rocks = rocks.concat(Shots.splitRock(rock));
+    rocks = rocks.concat(Collisions.splitRock(rock));
   });
 
   return _.compact(rocks);
