@@ -96,7 +96,8 @@ function doPlayerTick(player, state) {
   var ship = state.ships[player];
   var keys = state.keys[player];
 
-  var oShip = state.ships[player == 'a' ? 'b' : 'a'];
+  var oPlayer = player == 'a' ? 'b' : 'a';
+  var oShip = state.ships[oPlayer];
 
   ship = Tick.ship(ship, keys);
   ship.shots = Tick.shots(ship.shots);
@@ -106,10 +107,10 @@ function doPlayerTick(player, state) {
   }
 
   var newCollisions = Collisions.shipCollisions(oShip, ship.shots);
-
   if (newCollisions.length) {
+    state.ships[oPlayer] = shotsImpactShip(oShip, ship.shots, newCollisions);
     state.collisions = state.collisions.concat(
-      doShotCollisions(oShip, ship.shots, newCollisions));
+      createShotCollisions(ship.shots, oShip, newCollisions));
     ship.shots = removeCollidedShots(ship.shots, newCollisions);
   }
 
@@ -125,21 +126,33 @@ function doPlayerTick(player, state) {
   return state;
 }
 
-function doShotCollisions(oShip, shots, newCollisions) {
-  return _.map(newCollisions, (shotIndex) => {
+function shotsImpactShip(oShip, shots, collisions) {
+  collisions.forEach(function(shotIndex) {
     var collision = shots[shotIndex];
-
-    // TODO: Factor out side effects here
     oShip.spd.x += collision.spd.x/8;
     oShip.spd.y += collision.spd.y/8;
     oShip.spd = Tick.limitShipSpeed(oShip.spd);
+  });
 
+  return oShip;
+}
+
+function createShotCollisions(shots, oShip, collisions) {
+  return _.map(collisions, (shotIndex) => {
+    var collision = shots[shotIndex];
     collision.age = 0;
     collision.spd.x = oShip.spd.x;
     collision.spd.y = oShip.spd.y;
     return collision;
   });
+}
 
+function removeCollidedShots(shots, collisions) {
+  collisions.forEach(function (shotIndex) {
+    shots[shotIndex] = null;
+  });
+
+  return _.compact(shots);
 }
 
 function replaceCollidedRocks(_rocks, collisions) {
@@ -152,14 +165,6 @@ function replaceCollidedRocks(_rocks, collisions) {
   });
 
   return _.compact(rocks);
-}
-
-function removeCollidedShots(shots, collisions) {
-  collisions.forEach(function (shotIndex) {
-    shots[shotIndex] = null;
-  });
-
-  return _.compact(shots);
 }
 
 function snapshot(oCache, oStream, f) {
