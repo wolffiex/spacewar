@@ -16,11 +16,13 @@ function _drawFill(ctx, pos, r, shape) {
 }
 
 function _drawRock(ctx, rock, pos) {
+  ctx.save();
   ctx.translate(pos.x, pos.y);
   ctx.rotate(rock.rot);
   ctx.beginPath();
   drawShape(ctx, rock.shape);
   ctx.stroke();
+  ctx.restore();
 }
 
 function drawShape(ctx, shape) {
@@ -33,7 +35,6 @@ function drawShape(ctx, shape) {
 }
 
 exports.rocks = function(ctx, rocks) {
-  ctx.save();
   ctx.strokeStyle = '#FFF'
   ctx.lineWidth = 1;
   rocks.forEach(rock => {
@@ -45,8 +46,6 @@ exports.rocks = function(ctx, rocks) {
     }
 
   });
-
-  ctx.restore();
 }
 
 exports.ship = function(ctx, ship) {

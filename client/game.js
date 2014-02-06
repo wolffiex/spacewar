@@ -12,9 +12,8 @@ var Msg = require('utils').Msg;
 
 var xy = Point.xy;
 
-function combineKeysAndGame(keysInfo, gameInfo) {
-  return keysInfo
-    .combineLatest(gameInfo, (input, game) => {
+function combineKeysAndGame(keysInfo, game) {
+  return keysInfo.map((input) => {
       var t = Date.now() - game.t;
       if (t<0) return null;
 
@@ -33,38 +32,10 @@ function initGame(doc, canvas){
   var socket = RxWebSocket("ws://" + hostname + ":3001");
 
   // Game start and player info
-  // TODO: Maybe this should be "game" and be a closure
   var gameInfo = getGameInfo(socket);
 
-  // Mark key input with player and relative game time
-  var keyInput = combineKeysAndGame(Keys.getStream(doc), gameInfo);
-
-  // Send local input to other player
-  keyInput.map(k=>Msg('INPUT', k)).subscribe(socket);
-
-  
-  var rockSubject = new Rx.Subject();
-
-  var inputStream = keyInput
-    .merge(socket.filter(Msg.filter('INPUT')).map(Msg.value))
-    .merge(rockSubject);
-  
   var timer = new Rx.Subject();
-
-  function updateTimer() {
-    timer.onNext(Date.now());
-  }
-
-  var gameTime = timer.combineLatest(gameInfo, 
-    (update, game) => update - game.t);
-
-  var updater = gameTime.filter(t => t >= 0 );
-
-  var countdown = gameTime.takeUntil(updater).map(t => t * -1);
-
-  var simulation = Simulation(inputStream, updater);
-
-  getRockStream(gameInfo, simulation, socket).subscribe(rockSubject);
+  var updateTimer = () => {timer.onNext(Date.now())};
 
   var renderInfo = {
     ships : Simulation.initialShips,
@@ -73,18 +44,6 @@ function initGame(doc, canvas){
     rocks: [],
   };
 
-  simulation.subscribe(state => {
-    renderInfo.ships = state.ships;
-    renderInfo.collisions = state.collisions;
-    renderInfo.rocks = state.rocks;
-  });
-
-  countdown.subscribe(
-    t => { renderInfo.countdown = t},
-    () => { console.error('Countdown error')},
-    () => { renderInfo.countdown = null},
-  );
-
   function render() {
     draw(ctx, renderInfo);
     requestAnimationFrame(render);
@@ -92,6 +51,54 @@ function initGame(doc, canvas){
   };
 
   requestAnimationFrame(render);
+
+  // Once the preamble is done, setup the game. This could be part of the
+  // reactive pipeline, but the code is a little simpler if it's just written in
+  // a closure. In this case, we use the output of the pipeline for the steam of
+  // messages bound for the other client
+  gameInfo.flatMap(function(game) {
+    // This is either a stream of rocks if player="a" or empty
+    // It's a circular dependency for the game, so we need to
+    // use a subject here and wire it up below
+    var rockSubject = new Rx.Subject();
+
+    // Mark key input with player and relative game time
+    var keyInput = combineKeysAndGame(
+      Keys.getStream(doc).merge(rockSubject), game);
+
+    var inputStream = keyInput
+      .merge(socket.filter(Msg.filter('INPUT')).map(Msg.value));
+    
+    var gameTimer = timer.map(update => update - game.t);
+
+    var updater = gameTimer.filter(t => t >= 0 );
+
+    var countdown = gameTimer.takeUntil(updater).map(t => t * -1);
+
+    var simulation = Simulation(inputStream, updater);
+
+    if (game.player == 'a') {
+      getRockStream(simulation).subscribe(rockSubject);
+    }
+
+    simulation.subscribe(state => {
+      renderInfo.ships = state.ships;
+      renderInfo.collisions = state.collisions;
+      renderInfo.rocks = state.rocks;
+    });
+
+    countdown.subscribe(
+      t => { renderInfo.countdown = t},
+      () => { console.error('Countdown error')},
+      () => { renderInfo.countdown = null},
+    );
+
+
+    // Send local input to other player
+    return keyInput.map(k=>Msg('INPUT', k));
+  }).subscribe(socket);
+
+
 }
 
 function draw(ctx, renderInfo) {
@@ -138,33 +145,24 @@ function draw(ctx, renderInfo) {
   }
 }
 
-function getRockStream(gameInfo, simulation, socket) {
-  return gameInfo.flatMap(function (game) {
-    if (game.player == 'a') {
-      // Player a makes rocks
-      var stream = Rx.Observable.fromArray([{
-        type: 'ROCK',
-        pos: xy(300, 300),
-        rot: 1,
-        rotspd: .001,
-        spd: xy(.02, .01),
-        t: 0,
-        shape: Shapes.makeRock(8, 20),
-      }]);
-
-      return stream
-
-    } else {
-      // Player b receives rocks
-      return Rx.Observable.empty();
-    }
-  });
+function getRockStream(simulation) {
+  return simulation.sample(2500)
+    .filter(state => Math.random() < (10-state.rocks.length)/10)
+    .map(state => {
+    return {
+      type: 'ROCK',
+      pos: xy(300, 300),
+      rot: 1,
+      rotspd: .001,
+      spd: xy(.02, .01),
+      shape: Shapes.makeRock(8, 20),
+    }});
 }
 
 global.initGame = initGame;
 
 
-var INTRO_TIME = 300;
+var INTRO_TIME = 600;
 // This tries to synchronize time between the players
 function getGameInfo(socket) {
   // INPUT messages are not part of the game setup
