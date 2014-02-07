@@ -34,7 +34,7 @@ function drawShape(ctx, shape) {
   });
 }
 
-exports.rocks = function(ctx, rocks) {
+drawRocks = function(ctx, rocks) {
   ctx.strokeStyle = '#FFF'
   ctx.lineWidth = 1;
   rocks.forEach(rock => {
@@ -48,7 +48,7 @@ exports.rocks = function(ctx, rocks) {
   });
 }
 
-exports.ship = function(ctx, ship) {
+drawShip = function(ctx, ship) {
   _drawFill(ctx, ship.pos, ship.rot, Shapes.ship);
   var otherSide = Point.foldOnScreen(ship.pos);
 
@@ -57,7 +57,7 @@ exports.ship = function(ctx, ship) {
   }
 }
 
-exports.shots = function(ctx, shotList) {
+drawShots = function(ctx, shotList) {
   shotList.forEach(function(shot) {
     var x = shot.pos.x;
     var y = shot.pos.y;
@@ -69,7 +69,7 @@ exports.shots = function(ctx, shotList) {
   });
 }
 
-exports.collisions = function(ctx, collisions) {
+drawCollisions = function(ctx, collisions) {
   ctx.fillStyle = '#FFA500';
   collisions.forEach(function(c) {
     var x = c.pos.x;
@@ -87,3 +87,48 @@ exports.collisions = function(ctx, collisions) {
 
   ctx.globalAlpha = 1;
 }
+
+module.exports = function (ctx, renderInfo) {
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, Point.screenSize.x, Point.screenSize.y);
+
+  ctx.fillStyle = '#FFF';
+  if (renderInfo.rocks.length) drawRocks(ctx, renderInfo.rocks);
+
+  ctx.fillStyle = '#0FF';
+  drawShip(ctx, renderInfo.ships.a);
+  ctx.fillStyle = '#F0F';
+  drawShip(ctx, renderInfo.ships.b);
+
+  ctx.fillStyle = '#0FF';
+  var shotsA = renderInfo.ships.a.shots;
+  if (shotsA.length) drawShots(ctx, shotsA);
+
+  var shotsB = renderInfo.ships.b.shots;
+  ctx.fillStyle = '#F0F';
+  if (shotsB.length) drawShots(ctx, shotsB);
+
+
+  if (renderInfo.collisions.length) {
+    drawCollisions(ctx, renderInfo.collisions);
+  }
+
+  if (renderInfo.countdown != null) {
+    ctx.fillStyle = '#FFF';
+    ctx.moveTo(200,200);
+    var basesize = 200;
+    var t = renderInfo.countdown;
+    var tSec = t/1000;
+    var tSecInt = Math.floor(tSec);
+    var tNano = tSec - tSecInt;
+
+    var secPercent = 1 -tNano;
+    ctx.globalAlpha = tNano;
+
+    var fontSize = 80 + Math.floor(secPercent * basesize);
+    ctx.font=fontSize + "px Courier";
+    ctx.fillText(tSecInt+1, 200, 200);
+  }
+}
+

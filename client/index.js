@@ -10,8 +10,8 @@ var State = require('./State');
 var notEmpty = require('utils').notEmpty;
 var Msg = require('utils').Msg;
 
-function combineKeysAndGame(keysInfo, game) {
-  return keysInfo.map((input) => {
+function combineInputAndGame(inputStream, game) {
+  return inputStream.map((input) => {
       var t = Date.now() - game.t;
       if (t<0) return null;
 
@@ -43,7 +43,7 @@ function init(doc, canvas){
   };
 
   function render() {
-    draw(ctx, renderInfo);
+    Draw(ctx, renderInfo);
     requestAnimationFrame(render);
     _.defer(updateTimer);
   };
@@ -61,7 +61,7 @@ function init(doc, canvas){
     var rockSubject = new Rx.Subject();
 
     // Mark key input with player and relative game time
-    var keyInput = combineKeysAndGame(
+    var keyInput = combineInputAndGame(
       Keys.getStream(doc).merge(rockSubject), game);
 
     var inputStream = keyInput
@@ -95,50 +95,6 @@ function init(doc, canvas){
     // Send local input to other player
     return keyInput.map(k=>Msg('INPUT', k));
   }).subscribe(socket);
-}
-
-function draw(ctx, renderInfo) {
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, Point.screenSize.x, Point.screenSize.y);
-
-  ctx.fillStyle = '#FFF';
-  if (renderInfo.rocks.length) Draw.rocks(ctx, renderInfo.rocks);
-
-  ctx.fillStyle = '#0FF';
-  Draw.ship(ctx, renderInfo.ships.a);
-  ctx.fillStyle = '#F0F';
-  Draw.ship(ctx, renderInfo.ships.b);
-
-  ctx.fillStyle = '#0FF';
-  var shotsA = renderInfo.ships.a.shots;
-  if (shotsA.length) Draw.shots(ctx, shotsA);
-
-  var shotsB = renderInfo.ships.b.shots;
-  ctx.fillStyle = '#F0F';
-  if (shotsB.length) Draw.shots(ctx, shotsB);
-
-
-  if (renderInfo.collisions.length) {
-    Draw.collisions(ctx, renderInfo.collisions);
-  }
-
-  if (renderInfo.countdown != null) {
-    ctx.fillStyle = '#FFF';
-    ctx.moveTo(200,200);
-    var basesize = 200;
-    var t = renderInfo.countdown;
-    var tSec = t/1000;
-    var tSecInt = Math.floor(tSec);
-    var tNano = tSec - tSecInt;
-
-    var secPercent = 1 -tNano;
-    ctx.globalAlpha = tNano;
-
-    var fontSize = 80 + Math.floor(secPercent * basesize);
-    ctx.font=fontSize + "px Courier";
-    ctx.fillText(tSecInt+1, 200, 200);
-  }
 }
 
 global.init = init;
