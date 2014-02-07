@@ -1,3 +1,4 @@
+var Rx = require('Rx');
 var Point = require('../Point');
 var Shapes = require('../Shapes');
 var _ = require('underscore');
@@ -51,12 +52,17 @@ function getShotCollisions(shots, pos, shape, bounding) {
 }
 
 var MAXROCKS = 4;
+
+var splitRockSubject = null;
 exports.getRockStream = function(simulation) {
+  splitRockSubject = new Rx.Subject();
+
   return simulation.sample(2500)
     .filter(state => Math.random() < (MAXROCKS-state.rocks.length)/MAXROCKS)
     .map(() => generateRock(0, xy(
       Math.random() * Point.screenSize.x,
-      Math.random() * Point.screenSize.y)));
+      Math.random() * Point.screenSize.y)))
+    .merge(splitRockSubject);
 }
 
 var ROCK_TYPES = [
@@ -96,17 +102,29 @@ function generateRock(rocktype, pos) {
     rotspd,
     radius,
     shape: Shapes.makeRock(ROCKTYPE.sides, radius),
+    id: "" + Math.random(),
   };
 }
 
+var seenRocks = {};
 exports.splitRock = function(rock) {
-  var pos = () => deepCopy(rock.pos);
-  switch(rock.rocktype) {
-    case 0:
-      return [generateRock(2, pos()), generateRock(1, pos())];
-    case 1:
-      return [generateRock(2, pos()), generateRock(2, pos())];
-    default:
-      return EMPTY_LIST;
-  }
+  _.defer(function() {
+    if (seenRocks[rock.id]) return;
+    var moreRocks = EMPTY_LIST;
+    var pos = () => deepCopy(rock.pos);
+    switch(rock.rocktype) {
+      case 0:
+        moreRocks = [generateRock(2, pos()), generateRock(1, pos())];
+        break;
+      case 1:
+        moreRocks = [generateRock(2, pos()), generateRock(2, pos())];
+        break;
+    }
+
+    if (!moreRocks.length) return;
+    seenRocks[rock.id] = true;
+    moreRocks.forEach(rock => {
+      splitRockSubject.onNext(rock);
+    });
+  });
 }

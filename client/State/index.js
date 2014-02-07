@@ -37,7 +37,7 @@ function mergeInput(state, input) {
   return state;
 }
 
-function Simulation(rawInput, updater) {
+function simulation(rawInput, updater) {
   var simState = Rx.Observable.return(initialState).concat(
       rawInput.map(function (input) {
         var p = gameList.length;
@@ -86,11 +86,10 @@ function simulate (state, newT) {
   return state;
 }
 
+exports.initialShips = initialState.ships 
 
-Simulation.initialShips = initialState.ships 
-
-Simulation.getRockStream = Collisions.getRockStream;
-module.exports = Simulation;
+exports.getRockStream = Collisions.getRockStream;
+exports.simulation = simulation;
 
 function doPlayerTick(player, state) {
   var ship = state.ships[player];
@@ -160,8 +159,7 @@ function replaceCollidedRocks(_rocks, collisions) {
   collisions.forEach(function (rockIndex) {
     var rock = rocks[rockIndex];
     rocks[rockIndex] = null;
-
-    rocks = rocks.concat(Collisions.splitRock(rock));
+    Collisions.splitRock(rock);
   });
 
   return _.compact(rocks);

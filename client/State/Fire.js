@@ -37,5 +37,3 @@ exports.repeat = function(ship) {
   if (lastAge > SHOTS.delay ) shots = tryFire(ship);
   return shots;
 }
-
-

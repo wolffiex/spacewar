@@ -6,7 +6,7 @@ var Draw = require('./Draw');
 var Point = require('./Point');
 var Keys = require('./Keys');
 var Shapes = require('./Shapes');
-var Simulation = require('./Simulation');
+var State = require('./State');
 var notEmpty = require('utils').notEmpty;
 var Msg = require('utils').Msg;
 
@@ -23,7 +23,7 @@ function combineKeysAndGame(keysInfo, game) {
     .share();
 }
 
-function initGame(doc, canvas){
+function init(doc, canvas){
   var ctx = canvas.getContext('2d');
 
   var hostname = doc.location.hostname;
@@ -36,7 +36,7 @@ function initGame(doc, canvas){
   var updateTimer = () => {timer.onNext(Date.now())};
 
   var renderInfo = {
-    ships : Simulation.initialShips,
+    ships : State.initialShips,
     collisions : [],
     countdown: null,
     rocks: [],
@@ -73,10 +73,10 @@ function initGame(doc, canvas){
 
     var countdown = gameTimer.takeUntil(updater).map(t => t * -1);
 
-    var simulation = Simulation(inputStream, updater);
+    var simulation = State.simulation(inputStream, updater);
 
     if (game.player == 'a') {
-      Simulation.getRockStream(simulation).subscribe(rockSubject);
+      State.getRockStream(simulation).subscribe(rockSubject);
     }
 
     simulation.subscribe(state => {
@@ -141,7 +141,7 @@ function draw(ctx, renderInfo) {
   }
 }
 
-global.initGame = initGame;
+global.init = init;
 
 
 var INTRO_TIME = 500;
