@@ -3,6 +3,7 @@ var _ = require('underscore');
 var deepCopy = require('utils').deepCopy;
 
 var Collisions = require('./Collisions');
+var Rocks = require('./Rocks');
 var Fire = require('./Fire');
 var Tick = require('./Tick');
 
@@ -88,7 +89,7 @@ function simulate (state, newT) {
 
 exports.initialShips = initialState.ships 
 
-exports.getRockStream = Collisions.getRockStream;
+exports.getRockStream = Rocks.getRockStream;
 exports.simulation = simulation;
 
 function doPlayerTick(player, state) {
@@ -159,7 +160,7 @@ function replaceCollidedRocks(_rocks, collisions) {
   collisions.forEach(function (rockIndex) {
     var rock = rocks[rockIndex];
     rocks[rockIndex] = null;
-    Collisions.splitRock(rock);
+    Rocks.splitRock(rock);
   });
 
   return _.compact(rocks);

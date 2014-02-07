@@ -52,7 +52,7 @@ function init(doc, canvas){
 
   // Once the preamble is done, setup the game. This could be part of the
   // reactive pipeline, but the code is a little simpler if it's just written in
-  // a closure. In this case, we use the output of the pipeline for the steam of
+  // a closure. In this case, we use the output of the pipeline for the stream of
   // messages bound for the other client
   gameInfo.flatMap(function(game) {
     // This is either a stream of rocks if player="a" or empty
@@ -60,7 +60,7 @@ function init(doc, canvas){
     // use a subject here and wire it up below
     var rockSubject = new Rx.Subject();
 
-    // Mark key input with player and relative game time
+    // Mark input with player and relative game time
     var keyInput = combineInputAndGame(
       Keys.getStream(doc).merge(rockSubject), game);
 
