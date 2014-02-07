@@ -2,13 +2,13 @@
 
 **Rx Spacewar** is a two player network arcade game in the category of low friction games like the original [Spacewar!](http://en.wikipedia.org/wiki/Spacewar_(video_game)), [Asteroids](http://en.wikipedia.org/wiki/Asteroids_(video_game)), and [Maelstrom](http://en.wikipedia.org/wiki/Maelstrom_(1992_video_game)).
 
-Its implementation is an experiment in applying the principles of reactive programming to make a fault tolerant distributed system that is eventually consistent.
+Its implementation is an experiment in applying the principles of reactive programming to make a practical example of a fault tolerant distributed system that is eventually consistent.
 
 <!--
 
 The process of developing this little game made me realize how alien the reactive paradigm feels at first. When I started, I collected all the input in a reactive stream, dumped that in a global variable and then wrote a conventional imperative arcade game that peeked at that input in a conventional game loop. But one thing I really liked about Rx was I was able to do that and get something working and then slowly figure out how to adapt to the Reactive paradigm.
 
-One thing I noticed was the way this upended my intutions about modularity. For example, when I originally wrote this, I had the files divided into the semantic things in the game, like ships, and shots and players. Over time, I refactored this along functional lines: ticking the simulation, or drawing. It was tickles me that functional programming is, well, more functional.
+One thing I noticed was the way this upended my intuitions about modularity. For example, when I originally wrote this, I had the files divided into the semantic things in the game, like ships, and shots and players. Over time, I refactored this along functional lines: ticking the simulation, or drawing. It was tickles me that functional programming is, well, more functional.
 
 But what Ben XXX said when he came here was that it takes about 6 weeks to become comfortable and looking at my git log, that's exactly where I am. Over time, I was able to adapt my imperative code better to the reactive paradigm.
 
@@ -32,7 +32,7 @@ The game goes through the following phases on the client:
 2. Synchronization
 3. Gameplay
 
-Initialization begins when the document is ready and sets up the reactive pipeline. Synchronization is initiated by the server and uses the [Berkeley algorithm](http://en.wikipedia.org/wiki/Berkeley_algorithm) with one of the clients acting as the master. Synchronization results in a relative time for each client after which the game starts. From then, input is reported to the other client in time relative to the game start. The game currently doesn't handle cases of clock skew.
+Initialization begins when the document is ready, and this step sets up the reactive pipeline. Synchronization is initiated by the server and uses the [Berkeley algorithm](http://en.wikipedia.org/wiki/Berkeley_algorithm) with one of the clients acting as the master. Synchronization results in a relative time for each client after which the game starts. At this point the game countdown beings and the reactive pipeline for the game is setup. From then, input is reported to the other client in time relative to the game start. The game currently doesn't handle cases of clock skew.
 
 Conceptually, the game has three threads. The *Input* thread combines local input from the keyboard, the random generator of rocks, and the input from the other player via the socket. 
 
