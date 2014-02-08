@@ -7,7 +7,7 @@ var Point = require('./Point');
 var Keys = require('./Keys');
 var Shapes = require('./Shapes');
 var Rocks = require('./Rocks');
-var State = require('./State');
+var Game = require('./Game');
 var notEmpty = require('utils').notEmpty;
 var Msg = require('utils').Msg;
 
@@ -35,7 +35,7 @@ function init(doc, canvas){
   var updateTimer = () => {timer.onNext(Date.now())};
 
   var renderInfo = {
-    ships : State.initialShips,
+    ships : Game.initialShips,
     collisions : [],
     countdown: null,
     rocks: [],
@@ -73,7 +73,7 @@ function init(doc, canvas){
 
     var countdown = gameTimer.takeUntil(updater).map(t => t * -1);
 
-    var simulation = State.simulation(inputStream, updater);
+    var simulation = Game.simulation(inputStream, updater);
 
     if (game.player == 'a') {
       Rocks.getRockStream(simulation).subscribe(rockSubject);
