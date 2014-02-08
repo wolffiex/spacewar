@@ -6,6 +6,7 @@ var Draw = require('./Draw');
 var Point = require('./Point');
 var Keys = require('./Keys');
 var Shapes = require('./Shapes');
+var Rocks = require('./Rocks');
 var State = require('./State');
 var notEmpty = require('utils').notEmpty;
 var Msg = require('utils').Msg;
@@ -13,8 +14,6 @@ var Msg = require('utils').Msg;
 function combineInputAndGame(inputStream, game) {
   return inputStream.map((input) => {
       var t = Date.now() - game.t;
-      if (t<0) return null;
-
       input.t = t;
       input.player = game.player;
       return input;
@@ -62,7 +61,8 @@ function init(doc, canvas){
 
     // Mark input with player and relative game time
     var keyInput = combineInputAndGame(
-      Keys.getStream(doc).merge(rockSubject), game);
+      Keys.getStream(doc).merge(rockSubject), game)
+      .filter( input => input.t >= 0);
 
     var inputStream = keyInput
       .merge(socket.filter(Msg.filter('INPUT')).map(Msg.value));
@@ -76,7 +76,7 @@ function init(doc, canvas){
     var simulation = State.simulation(inputStream, updater);
 
     if (game.player == 'a') {
-      State.getRockStream(simulation).subscribe(rockSubject);
+      Rocks.getRockStream(simulation).subscribe(rockSubject);
     }
 
     simulation.subscribe(state => {

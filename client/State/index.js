@@ -3,7 +3,6 @@ var _ = require('underscore');
 var deepCopy = require('utils').deepCopy;
 
 var Collisions = require('./Collisions');
-var Rocks = require('./Rocks');
 var Fire = require('./Fire');
 var Tick = require('./Tick');
 
@@ -40,30 +39,30 @@ function mergeInput(state, input) {
 
 function simulation(rawInput, updater) {
   var simState = Rx.Observable.return(initialState).concat(
-      rawInput.map(function (input) {
-        var p = gameList.length;
-        while (input.t < gameList[p-1].state.t) {
-          if (--p < 1) throw "Can't find time before " + input.t
-        }
+    rawInput.map(function (input) {
+      var p = gameList.length;
+      while (input.t < gameList[p-1].state.t) {
+        if (--p < 1) throw "Can't find time before " + input.t
+      }
 
-        gameList = fastSplice(gameList, p, {input:input, state: null});
+      gameList = fastSplice(gameList, p, {input:input, state: null});
 
-        // now run the simulation forward
-        for (p; p < gameList.length; p++) {
-          var state = deepCopy(gameList[p-1].state);
-          var input = gameList[p].input;
-          state = simulate(state, input.t);
+      // now run the simulation forward
+      for (p; p < gameList.length; p++) {
+        var state = deepCopy(gameList[p-1].state);
+        var input = gameList[p].input;
+        state = simulate(state, input.t);
 
-          state = mergeInput(state, input);
+        state = mergeInput(state, input);
 
-          gameList[p].state = Object.freeze(state);
-        }
+        gameList[p].state = Object.freeze(state);
+      }
 
-        if (gameList.length > 60) {
-          gameList = gameList.slice(30);
-        }
-        return state
-      }));
+      if (gameList.length > 60) {
+        gameList = gameList.slice(30);
+      }
+      return state
+    }));
 
   return snapshot(simState.map(deepCopy), updater,
     function(state, t) {
@@ -89,7 +88,6 @@ function simulate (state, newT) {
 
 exports.initialShips = initialState.ships 
 
-exports.getRockStream = Rocks.getRockStream;
 exports.simulation = simulation;
 
 function doPlayerTick(player, state) {
@@ -116,7 +114,7 @@ function doPlayerTick(player, state) {
 
   var newRockCollisions = Collisions.rockCollisions(ship.shots, state.rocks);
   if (newRockCollisions.length) {
-    state.rocks = replaceCollidedRocks(
+    state.rocks = removeCollidedRocks(
       state.rocks, _.pluck(newRockCollisions, 'rock'));
     ship.shots = removeCollidedShots(
       ship.shots, _.pluck(newRockCollisions, 'shot'));
@@ -155,12 +153,11 @@ function removeCollidedShots(shots, collisions) {
   return _.compact(shots);
 }
 
-function replaceCollidedRocks(_rocks, collisions) {
+function removeCollidedRocks(_rocks, collisions) {
   var rocks = _rocks;
   collisions.forEach(function (rockIndex) {
     var rock = rocks[rockIndex];
     rocks[rockIndex] = null;
-    Rocks.splitRock(rock);
   });
 
   return _.compact(rocks);
