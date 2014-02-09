@@ -9,6 +9,10 @@ var Tick = require('./Tick');
 var initialState = require('./initialState');
 
 exports.initialShips = initialState.ships 
+
+// This is the big ugly closure that manages the game state
+// The only thing that's visible from the outside of this, though
+// is a state for each update time that never goes backwards
 exports.simulation = function (rawInput, updater) {
   var gameList = [{state: initialState, input: null}];
 
@@ -40,10 +44,10 @@ exports.simulation = function (rawInput, updater) {
       var input = gameList[p].input;
 
       gameList[p].state = Object.freeze(
-        mergeInput(simulate(state, input.t), input));
+        mergeInput(input, 
+          simulate(state, input.t)));
     }
   }
-
 
   var inputBuffer = [];
   rawInput.subscribe(input => {
@@ -81,7 +85,7 @@ function simulate (state, newT) {
   return state;
 }
 
-function mergeInput(state, input) {
+function mergeInput(input, state) {
   switch (input.type) {
     case 'KEY':
       state.keys[input.player][input.action] = input.isDown;
@@ -99,7 +103,6 @@ function mergeInput(state, input) {
 
   return state;
 }
-
 
 function doPlayerTick(player, state) {
   var ship = state.ships[player];
