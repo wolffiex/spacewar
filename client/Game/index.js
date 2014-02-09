@@ -10,14 +10,6 @@ var initialState = require('./initialState');
 
 var gameList = [{state: initialState, input: null}];
 
-// special case to avoid slow call to splice in
-// the common case
-function fastSplice(list, idx, item) {
-  if (idx == list.length) list.push(item);
-  else list.splice(idx, 0, item);
-  return list;
-}
-
 function mergeInput(state, input) {
   switch (input.type) {
     case 'KEY':
@@ -38,6 +30,10 @@ function mergeInput(state, input) {
 }
 
 function simulation(rawInput, updater) {
+
+  // If a long time goes between inputs, it may take a while to redo the
+  // simulation up to the current time. This could be fixed by optimizing
+  // simulate() to recognize cases where it can use its last computed value.
   var simState = Rx.Observable.return(initialState).concat(
     rawInput.map(function (input) {
       var p = gameList.length;
@@ -51,17 +47,15 @@ function simulation(rawInput, updater) {
       for (p; p < gameList.length; p++) {
         var state = deepCopy(gameList[p-1].state);
         var input = gameList[p].input;
-        state = simulate(state, input.t);
 
-        state = mergeInput(state, input);
-
+        state = mergeInput(simulate(state, input.t), input);
         gameList[p].state = Object.freeze(state);
       }
 
       if (gameList.length > 60) {
         gameList = gameList.slice(30);
       }
-      return state
+      return state;
     }));
 
   return snapshot(simState.map(deepCopy), updater,
@@ -104,20 +98,18 @@ function doPlayerTick(player, state) {
     ship.shots = Fire.repeat(ship);
   }
 
-  var newCollisions = Collisions.shipCollisions(oShip, ship.shots);
-  if (newCollisions.length) {
-    state.ships[oPlayer] = shotsImpactShip(oShip, ship.shots, newCollisions);
+  var sCollisions = Collisions.shipCollisions(oShip, ship.shots);
+  if (sCollisions.length) {
+    state.ships[oPlayer] = shotsImpactShip(oShip, ship.shots, sCollisions);
     state.collisions = state.collisions.concat(
-      createShotCollisions(ship.shots, oShip, newCollisions));
-    ship.shots = removeCollidedShots(ship.shots, newCollisions);
+      createShotCollisions(ship.shots, oShip, sCollisions));
+    ship.shots = removeCollided(ship.shots, sCollisions);
   }
 
-  var newRockCollisions = Collisions.rockCollisions(ship.shots, state.rocks);
-  if (newRockCollisions.length) {
-    state.rocks = removeCollidedRocks(
-      state.rocks, _.pluck(newRockCollisions, 'rock'));
-    ship.shots = removeCollidedShots(
-      ship.shots, _.pluck(newRockCollisions, 'shot'));
+  var rCollisions = Collisions.rockCollisions(ship.shots, state.rocks);
+  if (rCollisions.length) {
+    state.rocks = removeCollided(state.rocks, _.pluck(rCollisions, 'rock'));
+    ship.shots = removeCollided(ship.shots, _.pluck(rCollisions, 'shot'));
   }
 
   state.ships[player] = ship;
@@ -145,24 +137,26 @@ function createShotCollisions(shots, oShip, collisions) {
   });
 }
 
-function removeCollidedShots(shots, collisions) {
-  collisions.forEach(function (shotIndex) {
-    shots[shotIndex] = null;
+function removeCollided(list, collisions) {
+  collisions.forEach(function (idx) {
+    list[idx] = null;
   });
 
-  return _.compact(shots);
+  return _.compact(list);
 }
 
-function removeCollidedRocks(_rocks, collisions) {
-  var rocks = _rocks;
-  collisions.forEach(function (rockIndex) {
-    var rock = rocks[rockIndex];
-    rocks[rockIndex] = null;
-  });
-
-  return _.compact(rocks);
+// special case to avoid slow call to splice in
+// the common case
+function fastSplice(list, idx, item) {
+  if (idx == list.length) list.push(item);
+  else list.splice(idx, 0, item);
+  return list;
 }
 
+
+// calls f() with the last value of oCache
+// for every value of oStream, as long as
+// there's at least one value for oCache
 function snapshot(oCache, oStream, f) {
   var hasCache = false;
   var _cache;

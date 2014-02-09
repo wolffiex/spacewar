@@ -5,7 +5,7 @@ var xy = Point.xy;
 
 var SHOTS = {
   max : 18,
-  delay: 400,
+  delay: 40,
   accel: xy(0.2, 0),
 };
 
