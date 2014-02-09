@@ -25,7 +25,7 @@ exports.startServer = function (options) {
     });
   }
 
-  var setup = server.map(function(socket) {
+  var setup = server.flatMap(function(socket) {
     var recv = Msg.recv(socket);
 
     var helo = Rx.Observable.return(Msg('HELO', Date.now())).share();
@@ -48,14 +48,14 @@ exports.startServer = function (options) {
         return Msg('SYNC', Date.now())
       }).share();
 
-    latency.subscribe(function(m) { console.log('latency', m) });
-
     helo.merge(sync1).merge(sync).subscribe(socket);
 
-    return {
-      latency : latency.single(),
-      socket: socket,
-    }
+    return latency.map(function(l) {
+      return {
+        latency: l,
+        socket: socket,
+      }});
+
   });
 
   return setup.bufferWithCount(2).map(function(_game, gameNum) {
@@ -67,35 +67,35 @@ exports.startServer = function (options) {
     var log = new Rx.ReplaySubject();
     log.onNext('Game ' + gameNum);
 
-    var start = game.a.latency.zip(game.b.latency, 
-      function(a, b) {
-        return { a: a, b: b };
-      }).share()
-    .delay(randRange(50))
-    .map(function(latency) {
-      return {
-        a: Msg('START', Math.round(START_DELAY-latency.a)),
-        b: Msg('START', Math.round(START_DELAY-latency.b)),
-      }
-    }).share();
-
     function setupPlayer(player) {
-      var oPlayer = player == 'a' ? 'b' : 'a';
-
+      var latency =  game[player].latency;
       var mySocket = game[player].socket;
-      var otherSocket = game[oPlayer].socket;
 
-      var myStart = start.map(function(msgs) {
-        log.onNext('start ' + player + ' ' + msgs[player].value);
-        return msgs[player];
-      }).single().share();
+      var otherSocket = game[player == 'a' ? 'b' : 'a'].socket;
 
-      myStart.concat(
+      var myStart = new Rx.Subject();
+      myStart.single().share().concat(
         otherSocket.skipUntil(myStart)).subscribe(mySocket);
+
+      var startMsg = Msg('START', {
+        player: player,
+        t: Math.round(START_DELAY - game[player].latency),
+      });
+
+      myStart.onNext(startMsg);
+      // Because of the single() on myStart
+      return function() {
+        myStart.onCompleted();
+      };
     }
 
-    setupPlayer('a');
-    setupPlayer('b');
+    var goA = setupPlayer('a');
+    var goB = setupPlayer('b');
+    // Ideally these would be executed concurrently
+    setTimeout(function() {
+      goA();
+      goB();
+    }, 150);
 
     log.onNext('Game setup ' + gameNum);
     return log;

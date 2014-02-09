@@ -112,7 +112,10 @@ function getGameInfo(socket) {
 
   helo.merge(sync).subscribe(socket);
 
-  return new Rx.Subject();
+  return recv('START').map(function(start) {
+    start.t += Date.now();
+    return start;
+  });
 }
 
 function unused() {
