@@ -27,6 +27,7 @@ function init(doc, canvas){
 
   var hostname = doc.location.hostname;
   var socket = RxWebSocket("ws://" + hostname + ":3001");
+  socket.subscribe(m => console.log('socker', m));
 
   // Game start and player info
   var gameInfo = getGameInfo(socket);
@@ -103,12 +104,18 @@ global.init = init;
 var INTRO_TIME = 500;
 // This tries to synchronize time between the players
 function getGameInfo(socket) {
-  // INPUT messages are not part of the game setup
-  // but this is really just an optimization
-  var game = socket.filter(msg => msg.key != 'INPUT').share();
+  var recv = Msg.recv(socket);
 
-  var recvMsg = k => game.filter(Msg.filter(k));
+  // At the very start, give the client some time to settle in
+  var helo = recv('HELO').delay(100).map(value => Msg('HELO', value));
+  var sync = recv('SYNC').map(value => Msg('SYNC', value));
 
+  helo.merge(sync).subscribe(socket);
+
+  return new Rx.Subject();
+}
+
+function unused() {
   var player = recvMsg('START').map(msg =>msg.value.player);
   // Player a: Send PING -> Recv PONG -> Send GO
   var sendPing = player.filter(p => p == 'a')
