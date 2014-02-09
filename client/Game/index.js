@@ -8,43 +8,61 @@ var Tick = require('./Tick');
 
 var initialState = require('./initialState');
 
-var gameList = [{state: initialState, input: null}];
-
 exports.initialShips = initialState.ships 
-
 exports.simulation = function (rawInput, updater) {
+  var gameList = [{state: initialState, input: null}];
 
-  // If a long time goes between inputs, it may take a while to redo the
-  // simulation up to the current time. This could be fixed by optimizing
-  // simulate() to recognize cases where it can use its last computed value.
-  var simState = Rx.Observable.return(initialState).concat(
-    rawInput.map(function (input) {
-      var p = gameList.length;
-      while (input.t < gameList[p-1].state.t) {
-        if (--p < 1) throw "Can't find time before " + input.t
-      }
 
-      gameList = fastSplice(gameList, p, {input:input, state: null});
+  function insertInput(input) {
+    var p = gameList.length;
+    var t = input.t
+    while (t < gameList[p-1].state.t) {
+      if (--p < 1) throw "Can't find time before " + t
+    }
 
-      // now run the simulation forward
-      for (p; p < gameList.length; p++) {
-        var state = deepCopy(gameList[p-1].state);
-        var input = gameList[p].input;
+    gameList = fastSplice(gameList, p, {input:input, state: {t}});
+    return p;
+  }
 
-        state = mergeInput(simulate(state, input.t), input);
-        gameList[p].state = Object.freeze(state);
-      }
 
-      if (gameList.length > 60) {
-        gameList = gameList.slice(30);
-      }
-      return state;
-    }));
+  function drainInputBuffer(inputBuffer) {
+    var p = _.min(inputBuffer.map(insertInput));
+    //console.log(p, gameList.length)
+    updateGameListFrom(p);
+    inputBuffer = [];
+    lastSimState = deepCopy(_.last(gameList).state);
+    return [];
+  }
 
-  return snapshot(simState.map(deepCopy), updater,
-    function(state, t) {
-      return simulate(state, t);
-    });
+  function updateGameListFrom(p) {
+    for (p; p < gameList.length; p++) {
+      var state = deepCopy(gameList[p-1].state);
+      var input = gameList[p].input;
+
+      gameList[p].state = Object.freeze(
+        mergeInput(simulate(state, input.t), input));
+    }
+  }
+
+
+  var inputBuffer = [];
+  rawInput.subscribe(input => {
+    inputBuffer.push(input);
+  });
+
+  var lastSimState = null;
+  return updater.map(function (t) {
+    if (inputBuffer.length) {
+      inputBuffer = drainInputBuffer(inputBuffer);
+      lastSimState = null;
+    }
+
+    if (!lastSimState) {
+      lastSimState = deepCopy(_.last(gameList).state);
+    }
+
+    return simulate(lastSimState, t);
+  })
 }
 
 function simulate (state, newT) {
