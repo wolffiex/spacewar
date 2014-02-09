@@ -49,19 +49,19 @@ exports.getRockStream = function(simulation) {
 var ROCK_TYPES = [
   {
     maxRot : 0.002,
-    accel : xy(0.03, 0),
+    accel : 0.03,
     radius: 20,
     sides: 10,
   },
   {
     maxRot : 0.004,
-    accel : xy(0.05, 0),
+    accel : 0.05,
     radius: 10,
     sides: 8,
   },
   {
     maxRot : 0.006,
-    accel : xy(0.07, 0),
+    accel : 0.07,
     radius: 4,
     sides: 6,
   },
@@ -96,7 +96,7 @@ function makeRock(rocktype, pos) {
   var ROCKTYPE = ROCK_TYPES[rocktype];
 
   var rotspd = ROCKTYPE.maxRot * 2 * Math.random() - ROCKTYPE.maxRot;
-  var spd = Point.rotate(ROCKTYPE.accel, Math.random() * 2 * Math.PI);
+  var spd = Point.vector(ROCKTYPE.accel, Math.random() * 2 * Math.PI);
   var radius = ROCKTYPE.radius;
 
   return {

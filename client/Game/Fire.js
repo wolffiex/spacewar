@@ -6,7 +6,7 @@ var xy = Point.xy;
 var SHOTS = {
   max : 18,
   delay: 400,
-  accel: xy(0.2, 0),
+  accel: 0.3,
 };
 
 // Mutates ship.shots
@@ -17,7 +17,7 @@ function tryFire(ship) {
     var shot = {
       age : 0,
       pos : Point.translate(ship.pos, Point.rotate(Shapes.shipNose, r)),
-      spd : Point.translate(ship.spd, Point.rotate(SHOTS.accel, r)),
+      spd : Point.translate(ship.spd, Point.vector(SHOTS.accel, r)),
     };
     shots.push(shot);
   }

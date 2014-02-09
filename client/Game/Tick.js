@@ -11,7 +11,7 @@ exports.rocks = function(rocks) {
   return rocks;
 }
 
-var rotSpeed = 0.003;
+var rotSpeed = 0.0025;
 var thrustAccel = xy(0.0004, 0);
 exports.ship = function(ship, keys) {
   updatePosWithSpd(ship);

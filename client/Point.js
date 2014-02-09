@@ -23,6 +23,9 @@ exports.translate = function(pt, dxdy) {
   return xy(pt.x + dxdy.x, pt.y + dxdy.y);
 }
 
+exports.vector = function(len, r) {
+  return xy(len * Math.cos(r), len * Math.sin(r));
+}
 
 var tolerance = 20;
 exports.foldOnScreen = function(pt) {
