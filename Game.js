@@ -25,40 +25,43 @@ exports.startServer = function (options) {
     });
   }
 
-  var setup = server.flatMap(function(socket) {
+  return server.flatMap(function(socket) {
     var recv = Msg.recv(socket);
 
     var helo = Rx.Observable.return(Msg('HELO', Date.now())).share();
 
-    var sync1 = recv('HELO').map(function() {
-      return Msg('SYNC', Date.now())
-    }).share();
+    var recvSync = recv('SYNC').share(); 
 
-    var latency = recv('SYNC')
+    var latency = recvSync
       .take(5)
       .map(function(t) {
         return Date.now() - t;
       }).share()
       .average();
 
-    var sync = recv('SYNC')
-      .takeUntil(latency)
+    var sync = recv('HELO').merge(recvSync)
       .delay(randRange(50))
+      .takeUntil(latency)
       .map(function() {
         return Msg('SYNC', Date.now())
       }).share();
 
-    helo.merge(sync1).merge(sync).subscribe(socket);
+    helo.merge(sync).subscribe(socket);
+
+    // I'm not too happy that I had to add this API to to web socket
+    // connections, since I generally like the idea the socket should close when
+    // noone is observing it and/or it's not observing anything. But in this
+    // case, the sequence that calcuates latency may terminate before the game
+    // starts, and we need to tell the socket that. It gets unpinned once the
+    // game starts
+    socket.pinOpen();
 
     return latency.map(function(l) {
       return {
         latency: l,
         socket: socket,
-      }});
-
-  });
-
-  return setup.bufferWithCount(2).map(function(_game, gameNum) {
+      }})
+  }).bufferWithCount(2).map(function(_game, gameNum) {
     var game = {
       a : _game[0],
       b : _game[1],
@@ -74,7 +77,7 @@ exports.startServer = function (options) {
       var otherSocket = game[player == 'a' ? 'b' : 'a'].socket;
 
       var myStart = new Rx.Subject();
-      myStart.single().share().concat(
+      myStart.single().concat(
         otherSocket.skipUntil(myStart)).subscribe(mySocket);
 
       var startMsg = Msg('START', {
@@ -83,9 +86,12 @@ exports.startServer = function (options) {
       });
 
       myStart.onNext(startMsg);
-      // Because of the single() on myStart
+
+      // Because of the single() on myStart, that message isn't
+      // flushed until this is called
       return function() {
         myStart.onCompleted();
+        mySocket.unpinOpen();
       };
     }
 
@@ -95,7 +101,7 @@ exports.startServer = function (options) {
     setTimeout(function() {
       goA();
       goB();
-    }, 150);
+    }, randRange(40));
 
     log.onNext('Game setup ' + gameNum);
     return log;
