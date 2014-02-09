@@ -11,24 +11,13 @@ var Game = require('./Game');
 var notEmpty = require('utils').notEmpty;
 var Msg = require('utils').Msg;
 
-function combineInputAndGame(inputStream, game) {
-  return inputStream.map((input) => {
-      var t = Date.now() - game.t;
-      input.t = t;
-      input.player = game.player;
-      return input;
-    })
-    .filter(notEmpty)
-    .share();
-}
-
-function init(doc, canvas){
+global.init = function (doc, canvas){
   var ctx = canvas.getContext('2d');
 
   var hostname = doc.location.hostname;
   var socket = RxWebSocket("ws://" + hostname + ":3001");
 
-  // Game start and player info
+  // Game start time and player info
   var gameInfo = getGameInfo(socket);
 
   var timer = new Rx.Subject();
@@ -55,23 +44,19 @@ function init(doc, canvas){
   // messages bound for the other client
   gameInfo.flatMap(function(game) {
     // This is either a stream of rocks if player="a" or empty
-    // It's a circular dependency for the game, so we need to
-    // use a subject here and wire it up below
+    // It's a circular dependency for the game simulation, so we need to use a
+    // subject here and wire it up below
     var rockSubject = new Rx.Subject();
+    var recv = Msg.recv(socket);
 
     // Mark input with player and relative game time
-    var keyInput = combineInputAndGame(
+    var localInput = combineInputAndGame(
       Keys.getStream(doc).merge(rockSubject), game)
-      .filter( input => input.t >= 0);
 
-    var inputStream = keyInput
-      .merge(socket.filter(Msg.filter('INPUT')).map(Msg.value));
+    var inputStream = localInput.merge(recv('INPUT'));
     
-    var gameTimer = timer.map(update => update - game.t);
-
+    var gameTimer = timer.map(update => update - game.t).share();
     var updater = gameTimer.filter(t => t >= 0 );
-
-    var countdown = gameTimer.takeUntil(updater).map(t => t * -1);
 
     var simulation = Game.simulation(inputStream, updater);
 
@@ -85,23 +70,19 @@ function init(doc, canvas){
       renderInfo.rocks = state.rocks;
     });
 
-    countdown.subscribe(
+    // countdown
+    gameTimer.takeUntil(updater).map(t => t * -1).subscribe(
       t => { renderInfo.countdown = t},
       () => { console.error('Countdown error')},
       () => { renderInfo.countdown = null},
     );
 
-
     // Send local input to other player
-    return keyInput.map(k=>Msg('INPUT', k));
+    return localInput.map(k => Msg('INPUT', k));
   }).subscribe(socket);
 }
 
-global.init = init;
-
-
-var INTRO_TIME = 500;
-// This tries to synchronize time between the players
+// This corresponds to setup portion of server logic
 function getGameInfo(socket) {
   var recv = Msg.recv(socket);
 
@@ -112,7 +93,19 @@ function getGameInfo(socket) {
   helo.merge(sync).subscribe(socket);
 
   return recv('START').map(function(start) {
+    // record received from server = {t: <MS to wait before start>, player}
     start.t += Date.now();
     return start;
   });
+}
+
+function combineInputAndGame(inputStream, game) {
+  return inputStream.map((input) => {
+      var t = Date.now() - game.t;
+      input.t = t;
+      input.player = game.player;
+      return input;
+    })
+    .filter( input => input.t >= 0)
+    .share();
 }

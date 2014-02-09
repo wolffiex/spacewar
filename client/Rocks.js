@@ -3,7 +3,6 @@ var Point = require('./Point');
 var Shapes = require('./Shapes');
 var _ = require('underscore');
 var deepCopy = require('utils').deepCopy;
-var notEmpty = require('utils').notEmpty;
 var xy = Point.xy;
 
 var MAXROCKS = 4;
@@ -28,8 +27,12 @@ exports.getRockStream = function(simulation) {
         }
       });
 
-      // Doh, can't retain this reference
-      oldRocks = rocks.concat();
+      // If the rock list has changed, there are either split
+      // rocks or there's a new rock, meaning that lenghts of
+      // the rock lists are different
+      if (splits != EMPTY_LIST || oldRocks.length != rocks.length) {
+        oldRocks = rocks.concat();
+      }
 
       return splits;
     })
@@ -73,6 +76,19 @@ function newRock() {
 
 }
 
+function splitRock(rock) {
+  var splitTypes = EMPTY_LIST;
+
+  switch(rock.rocktype) {
+    case 0:
+      splitTypes = [2,1];
+    case 1:
+      splitTypes = [2,2];
+  }
+
+  return _.map(splitTypes, type => makeRock(type, deepCopy(rock.pos)));
+}
+
 function makeRock(rocktype, pos) {
   var ROCKTYPE = ROCK_TYPES[rocktype];
 
@@ -91,17 +107,4 @@ function makeRock(rocktype, pos) {
     shape: Shapes.makeRock(ROCKTYPE.sides, radius),
     id: "" + Math.random(),
   };
-}
-
-function splitRock(rock) {
-  var splitTypes = EMPTY_LIST;
-
-  switch(rock.rocktype) {
-    case 0:
-      splitTypes = [2,1];
-    case 1:
-      splitTypes = [2,2];
-  }
-
-  return _.map(splitTypes, type => makeRock(type, deepCopy(rock.pos)));
 }

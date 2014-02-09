@@ -25,7 +25,8 @@ exports.startServer = function (options) {
     });
   }
 
-  return server.flatMap(function(socket) {
+  // Setup determines average latency for the socket
+  var setup = server.flatMap(function(socket) {
     var recv = Msg.recv(socket);
 
     var helo = Rx.Observable.return(Msg('HELO', Date.now())).share();
@@ -61,7 +62,9 @@ exports.startServer = function (options) {
         latency: l,
         socket: socket,
       }})
-  }).bufferWithCount(2).map(function(_game, gameNum) {
+  });
+  
+  return setup.bufferWithCount(2).map(function(_game, gameNum) {
     var game = {
       a : _game[0],
       b : _game[1],
@@ -71,7 +74,8 @@ exports.startServer = function (options) {
     log.onNext('Game ' + gameNum);
 
     function setupPlayer(player) {
-      var latency =  game[player].latency;
+      // Cristian's algorithm
+      var recvLatency =  game[player].latency / 2;
       var mySocket = game[player].socket;
 
       var otherSocket = game[player == 'a' ? 'b' : 'a'].socket;
@@ -81,7 +85,7 @@ exports.startServer = function (options) {
 
       var startMsg = Msg('START', {
         player: player,
-        t: Math.round(START_DELAY - game[player].latency),
+        t: Math.round(START_DELAY - recvLatency),
       });
 
       // Because of the single() on myStart, that message isn't
