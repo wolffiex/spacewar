@@ -9,6 +9,7 @@ var MAXROCKS = 4;
 var EMPTY_LIST = [];
 
 var oldRocks = [];
+var lastRocks = null
 exports.getRockStream = function(simulation) {
 
   // This is in the inner loop, so careful not
@@ -30,8 +31,9 @@ exports.getRockStream = function(simulation) {
       // If the rock list has changed, there are either split
       // rocks or there's a new rock, meaning that lenghts of
       // the rock lists are different
-      if (splits != EMPTY_LIST || oldRocks.length != rocks.length) {
+      if (lastRocks != rocks) {
         oldRocks = rocks.concat();
+        lastRocks = rocks;
       }
 
       return splits;
@@ -82,8 +84,10 @@ function splitRock(rock) {
   switch(rock.rocktype) {
     case 0:
       splitTypes = [2,1];
+      break;
     case 1:
       splitTypes = [2,2];
+      break;
   }
 
   return _.map(splitTypes, type => makeRock(type, deepCopy(rock.pos)));
