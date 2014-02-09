@@ -11,7 +11,6 @@ var EMPTY_LIST = [];
 var oldRocks = [];
 var lastRocks = null
 exports.getRockStream = function(simulation) {
-
   // This is in the inner loop, so careful not
   // to make an extra observable on every frame
   var splitRocks = simulation.map(

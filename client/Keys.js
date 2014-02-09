@@ -11,7 +11,6 @@ var KEY_CODES = {
 exports.actions = _.values(KEY_CODES);
 
 exports.getStream = (doc) => {
-
   // Get keyCode of first event
   var getKeyCode = args => args[0].keyCode;
 

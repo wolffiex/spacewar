@@ -10,26 +10,9 @@ var initialState = require('./initialState');
 
 var gameList = [{state: initialState, input: null}];
 
-function mergeInput(state, input) {
-  switch (input.type) {
-    case 'KEY':
-      state.keys[input.player][input.action] = input.isDown;
+exports.initialShips = initialState.ships 
 
-      // We also account for initial shot when we merge input
-      if (input.action == 'fire' && input.isDown) {
-        var ship = state.ships[input.player];
-        ship.shots = Fire.start(ship, input.t);
-      }
-      break;
-    case 'ROCK':
-      state.rocks.push(deepCopy(input));
-      break;
-  }
-
-  return state;
-}
-
-function simulation(rawInput, updater) {
+exports.simulation = function (rawInput, updater) {
 
   // If a long time goes between inputs, it may take a while to redo the
   // simulation up to the current time. This could be fixed by optimizing
@@ -80,9 +63,25 @@ function simulate (state, newT) {
   return state;
 }
 
-exports.initialShips = initialState.ships 
+function mergeInput(state, input) {
+  switch (input.type) {
+    case 'KEY':
+      state.keys[input.player][input.action] = input.isDown;
 
-exports.simulation = simulation;
+      // We also account for initial shot when we merge input
+      if (input.action == 'fire' && input.isDown) {
+        var ship = state.ships[input.player];
+        ship.shots = Fire.start(ship, input.t);
+      }
+      break;
+    case 'ROCK':
+      state.rocks.push(deepCopy(input));
+      break;
+  }
+
+  return state;
+}
+
 
 function doPlayerTick(player, state) {
   var ship = state.ships[player];
