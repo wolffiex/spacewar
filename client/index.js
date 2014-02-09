@@ -27,7 +27,6 @@ function init(doc, canvas){
 
   var hostname = doc.location.hostname;
   var socket = RxWebSocket("ws://" + hostname + ":3001");
-  socket.subscribe(m => console.log('socker', m));
 
   // Game start and player info
   var gameInfo = getGameInfo(socket);

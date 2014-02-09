@@ -77,18 +77,16 @@ exports.startServer = function (options) {
       var otherSocket = game[player == 'a' ? 'b' : 'a'].socket;
 
       var myStart = new Rx.Subject();
-      myStart.single().concat(
-        otherSocket.skipUntil(myStart)).subscribe(mySocket);
+      myStart.single().concat(otherSocket).subscribe(mySocket);
 
       var startMsg = Msg('START', {
         player: player,
         t: Math.round(START_DELAY - game[player].latency),
       });
 
-      myStart.onNext(startMsg);
-
       // Because of the single() on myStart, that message isn't
       // flushed until this is called
+      myStart.onNext(startMsg);
       return function() {
         myStart.onCompleted();
         mySocket.unpinOpen();
