@@ -16,9 +16,6 @@ exports.initialShips = initialState.ships
 exports.simulation = function (rawInput, updater) {
   var gameList = [{state: initialState, input: null}];
 
-
-
-
   function drainInputBuffer(inputBuffer) {
     var p = _.min(inputBuffer.map(function (input) {
       var p = gameList.length;

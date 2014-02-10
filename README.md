@@ -4,38 +4,20 @@
 
 Its implementation is an experiment in applying the principles of reactive programming to make a practical example of a fault tolerant distributed system that is eventually consistent.
 
-<!--
+##Use
+1. Start the game by running <code>$ node app.js</code>
+2. Connect a web browser to port 3000
+3. Game will wait for two connections before starting, or change code in <code>/Game.js</code> to enable loopback behavior.
 
-The process of developing this little game made me realize how alien the reactive paradigm feels at first. When I started, I collected all the input in a reactive stream, dumped that in a global variable and then wrote a conventional imperative arcade game that peeked at that input in a conventional game loop. But one thing I really liked about Rx was I was able to do that and get something working and then slowly figure out how to adapt to the Reactive paradigm.
-
-One thing I noticed was the way this upended my intuitions about modularity. For example, when I originally wrote this, I had the files divided into the semantic things in the game, like ships, and shots and players. Over time, I refactored this along functional lines: ticking the simulation, or drawing. It was tickles me that functional programming is, well, more functional.
-
-But what Ben XXX said when he came here was that it takes about 6 weeks to become comfortable and looking at my git log, that's exactly where I am. Over time, I was able to adapt my imperative code better to the reactive paradigm.
-
-One of the last steps of this was untangling the dependency between the stream of input from the users vs the stream of update requests from 
-
-###Observable of observables
-e.g. sockets, server logging,  gameInfo?
-###Immutability and share()
-###Observable transport
-
--->
-Rx Spacewar uses a "replay" strategy to achieve consistency across clients. When out-of-order input is received, that input is sorted into its proper place in the time-ordered list of input, and state is reset to the state before the disordered input. The subsequent input is then replayed, resulting in a recomputed game state.
+## Implementation notes
+Rx Spacewar uses a "replay" strategy to achieve consistency across clients. When out-of-order input is received, that input is sorted into its proper place in the time-ordered list of input, and state is reset to the state before the disordered input. The subsequent input is then replayed, resulting in a recomputed game state. [This article] (http://gafferongames.com/networking-for-game-programmers/what-every-programmer-needs-to-know-about-game-networking/) is a good primer on how time is usually handled in game programs. The strategy used here replaces server control in favor of enventual consistency. 
 
 ![alt text](./README.png "Rx pipeline for Spacewar")
 
-The server is a simple Rx pipeline that combines two socket connections, sends a "START" message to each, and then forwards messages received on one socket to the other one. It also contains a little bit of smarts to make it possible to loopback input and play a game with single socket.
+The server progresses clients through two phases: first, the server determines the latency of the round trip to a connected client using  [Cristian's algorithm](http://en.wikipedia.org/wiki/Cristian's_algorithm) with the server acting as the master. Once this is determined, two connections are brought together with <code>bufferWithCount(2,1)</code>. Each connection is told to start, and then messages from one client are sent to the other, and vice-versa. The server also contains a little bit of smarts to make it possible to loopback input and play a game with single socket.
 
-The game goes through the following phases on the client:
+The client initializes the game when the document is ready, and this step sets opens the socket. When the client receives the START message from the server, the reactive pipeline for the game is setup and the countdown begins. From then, input is reported to the other client in time relative to the game start. The game currently doesn't handle cases of clock skew.
 
-1. Initialization
-2. Synchronization
-3. Gameplay
+Conceptually, the game has three threads. The *Input* thread combines local input from the keyboard, the random generator of rocks, and the input from the other player via the socket into a list that polled from the *Game* thread.
 
-Initialization begins when the document is ready, and this step sets up the reactive pipeline. Synchronization is initiated by the server and uses the [Berkeley algorithm](http://en.wikipedia.org/wiki/Berkeley_algorithm) with one of the clients acting as the master. Synchronization results in a relative time for each client after which the game starts. At this point the game countdown beings and the reactive pipeline for the game is setup. From then, input is reported to the other client in time relative to the game start. The game currently doesn't handle cases of clock skew.
-
-Conceptually, the game has three threads. The *Input* thread combines local input from the keyboard, the random generator of rocks, and the input from the other player via the socket. 
-
-The *Game* thread runs on the timeout hook, but its execution is controlled by the *Render* thread. The *Render* thread runs inside <code>requestAnimationFrame</code> and schedules execution of the Game thread. In practice, the Game state is partially computed on the Input thread because I haven't quite wrapped my mind around Rx Schedulers yet.
-
-Rendering is handled with the super-cool Canvas 2D API. 
+The *Game* thread runs on the timeout hook, but its execution is controlled by the *Render* thread. The *Game* thread merges input if necessary and then computes game state for a given game time. The *Render* thread runs inside <code>requestAnimationFrame</code> and schedules execution of the Game thread.
