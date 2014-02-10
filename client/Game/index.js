@@ -17,28 +17,21 @@ exports.simulation = function (rawInput, updater) {
   var gameList = [{state: initialState, input: null}];
 
 
-  function insertInput(input) {
-    var p = gameList.length;
-    var t = input.t
-    while (t < gameList[p-1].state.t) {
-      if (--p < 1) throw "Can't find time before " + t
-    }
-
-    gameList = fastSplice(gameList, p, {input:input, state: {t}});
-    return p;
-  }
 
 
   function drainInputBuffer(inputBuffer) {
-    var p = _.min(inputBuffer.map(insertInput));
-    //console.log(p, gameList.length)
-    updateGameListFrom(p);
-    inputBuffer = [];
-    lastSimState = deepCopy(_.last(gameList).state);
-    return [];
-  }
+    var p = _.min(inputBuffer.map(function (input) {
+      var p = gameList.length;
+      var t = input.t
+      while (t < gameList[p-1].state.t) {
+        if (--p < 1) throw "Can't find time before " + t
+      }
 
-  function updateGameListFrom(p) {
+      gameList = fastSplice(gameList, p, {input:input, state: {t}});
+      return p;
+    }));
+
+    //console.log(p, gameList.length)
     for (p; p < gameList.length; p++) {
       var state = deepCopy(gameList[p-1].state);
       var input = gameList[p].input;
@@ -47,6 +40,8 @@ exports.simulation = function (rawInput, updater) {
         mergeInput(input, 
           simulate(state, input.t)));
     }
+
+    return [];
   }
 
   var inputBuffer = [];
@@ -72,6 +67,9 @@ exports.simulation = function (rawInput, updater) {
 function simulate (state, newT) {
   if (newT < state.t) console.log('backwards', state.t - newT);
 
+  // This is lazy, but we just skip simulating frames that have
+  // new input to avoid having to merge input inside the loop.
+  // That's why we never process tick t
   for (var t = state.t+1; t < newT; t++) {
     state.collisions = Tick.collisions(state.collisions);
 
@@ -171,20 +169,4 @@ function fastSplice(list, idx, item) {
   if (idx == list.length) list.push(item);
   else list.splice(idx, 0, item);
   return list;
-}
-
-
-// calls f() with the last value of oCache
-// for every value of oStream, as long as
-// there's at least one value for oCache
-function snapshot(oCache, oStream, f) {
-  var hasCache = false;
-  var _cache;
-  oCache.subscribe(c => {
-    hasCache = true;
-    _cache = c
-  });
-
-  return oStream.filter(() => hasCache)
-    .map(stream => f(_cache, stream));
 }
