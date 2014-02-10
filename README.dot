@@ -1,10 +1,25 @@
 digraph G {
   compound=true;
 
+  subgraph clusterLatency {
+    helo -> sync;
+    sync -> sync;
+    sync -> latency;
+  }
+
   subgraph clusterGame {
-    start;
-    gameInfo->gameState;
-    input->gameState;
+    rocks -> localInput;
+    renderState->rocks [weight=0];
+    rocks->remote;
+
+    start -> gameInfo;
+    keys -> localInput;
+    localInput->gameState;
+    localInput->remote;
+    remote->remoteInput;
+    remoteInput->gameState;
+
+    gameInfo->localInput;
     gameState->renderState;
     renderState->end;
     
@@ -14,47 +29,20 @@ digraph G {
     renderState->render;
     label = "Game";
 
-    renderTimeout [label="timeout", shape=invhouse];
+    remote [shape=hexagon];
+    gameInfo [label="game info"];
+    localInput [label="local input"];
+    remoteInput [label="remote input"];
+    renderTimeout [label="timer", shape=invhouse];
     requestAnimationFrame [shape=invhouse];
-    render [shape=hexagon];
+    render [shape=invhouse];
     gameState [label="game state"];
     renderState [label="render state"];
-
-    subgraph clusterSocketA {
-      ping->go [style="invis"];
-      go->inputA;
-      inputA [label="input"];
-      label = "Socket A";
-    }
-
-    subgraph clusterSocketB {
-      pong->go_b [style="invis"];
-      go_b->inputB;
-      go_b [label="go"];
-      inputB [label="input"];
-      label = "Socket B";
-    }
-
-
   }
 
-  inputA->inputB;
-  inputB->inputA;
-  inputA->input;
-  inputB->input;
-
-  start->ping [lhead=clusterSocketA];
-  start->pong [lhead=clusterSocketB];
-
-  ping->pong [weight=0];
-  pong->go [weight=0];
-  go->go_b [weight=0];
-
-  go->gameInfo;
-  go_b->gameInfo;
-
-  sockets -> start [label="buffer 2"];
-  end -> log [label="mergeAll"];
+  sockets -> helo;
+  latency -> start [label="buffer 2"];
+  end -> log [ltail="clusterGame" label="mergeAll"];
   //a -> b [label="hello", style=dashed];
   //a -> c [label="world"];
   //c -> d; b -> c; d -> a;

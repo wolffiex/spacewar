@@ -29,7 +29,7 @@ exports.ship = function(ship, keys) {
   return ship;
 }
 
-var SHOT_LIFE = 1600;
+var SHOT_LIFE = 1000;
 exports.shots = function(shots) {
   var keepAll = true;
   shots.forEach(function(shot) {
