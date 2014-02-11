@@ -16,8 +16,10 @@ exports.initialShips = initialState.ships
 exports.simulation = function (rawInput, updater) {
   var gameList = [{state: initialState, input: null}];
 
-  function drainInputBuffer(inputBuffer) {
-    var p = _.min(inputBuffer.map(function (input) {
+  function processInputs(inputs) {
+    if (!inputs.length) return false;
+
+    var p = _.min(inputs.map(function (input) {
       var p = gameList.length;
       var t = input.t
       while (t < gameList[p-1].state.t) {
@@ -38,18 +40,12 @@ exports.simulation = function (rawInput, updater) {
           simulate(state, input.t)));
     }
 
-    return [];
+    return true;
   }
 
-  var inputBuffer = [];
-  rawInput.subscribe(input => {
-    inputBuffer.push(input);
-  });
-
   var lastSimState = null;
-  return updater.map(function (t) {
-    if (inputBuffer.length) {
-      inputBuffer = drainInputBuffer(inputBuffer);
+  return zipBuffer(updater, rawInput, function(t, inputs) {
+    if (processInputs(inputs)) {
       lastSimState = null;
     }
 
@@ -58,7 +54,7 @@ exports.simulation = function (rawInput, updater) {
     }
 
     return simulate(lastSimState, t);
-  })
+  });
 }
 
 function simulate (state, newT) {
@@ -158,6 +154,22 @@ function removeCollided(list, collisions) {
   });
 
   return _.compact(list);
+}
+
+//Optimized version of as.zip(bs.buffer(as), f)
+function zipBuffer(as, bs, f) {
+  var buffer = [];
+  bs.subscribe(b => {
+    buffer.push(b);
+  });
+
+  return as.map(a => {
+    var tBuffer = buffer;
+    if (buffer.length) {
+      buffer = [];
+    }
+    return f(a, tBuffer)
+  });
 }
 
 // special case to avoid slow call to splice in
