@@ -10,6 +10,7 @@ var deepCopy = utils.deepCopy;
 var notEmpty = utils.notEmpty;
 
 var START_DELAY = 5000;
+var START_DELAY = 5000;
 
 function randRange(x) {
   return Math.floor(x + x * Math.random())
@@ -20,8 +21,12 @@ exports.startServer = function (options) {
 
   // Setup determines average latency for the socket
   var setup = server.flatMap(function(socket) {
-    var recv = Msg.recv(socket);
 
+    // This is lame, but we have to pin the socket open here so that it stays
+    // open even after we're done calculating latency but before the game starts
+    var pin = socket.subscribe(function() {});
+
+    var recv = Msg.recv(socket);
     var helo = Rx.Observable.return(Msg('HELO', Date.now())).share();
 
     var recvSync = recv('SYNC').share(); 
@@ -38,21 +43,18 @@ exports.startServer = function (options) {
       .takeUntil(latency)
       .map(function() {
         return Msg('SYNC', Date.now())
-      }).share();
+      })
+      .share();
 
-    helo.merge(sync).subscribe(socket);
-
-    // I'm not too happy that I had to add this API to to web socket
-    // connections, since I generally like the idea the socket should close when
-    // noone is observing it and/or it's not observing anything. But in this
-    // case, the sequence that calcuates latency may terminate before the game
-    // starts, and we need to tell the socket that. It gets unpinned once the
-    // game starts
-    socket.pinOpen();
+    helo.merge(sync)
+      // Don't let socket close after sync is done
+      .concat(Rx.Observable.never())
+      .subscribe(socket);
 
     return latency.map(function(l) {
       return {
         latency: l,
+        unpinSocket: pin.dispose.bind(pin),
         socket: socket,
       }})
   });
@@ -61,6 +63,7 @@ exports.startServer = function (options) {
     setup = setup.flatMap(function(connection) {
       return Rx.Observable.fromArray([connection, {
         latency: 0,
+        unpinSocket: function() {},
         socket: loopback(connection.socket),
       }]);
     });
@@ -79,11 +82,17 @@ exports.startServer = function (options) {
       var recvLatency =  game[player].latency / 2;
 
       var mySocket = game[player].socket;
-      var otherSocket = game[player == 'a' ? 'b' : 'a'].socket;
-
+      var otherPlayer = player == 'a' ? 'b' : 'a';
+      var otherSocket = game[otherPlayer].socket;
 
       var myStart = new Rx.Subject();
-      myStart.single().concat(otherSocket).subscribe(mySocket);
+      // Using merge instead of concat here means that we
+      // can unpin the otherSocket once the pipeline is setup.
+      // Otherwise, the socket isn't subscribed until myStart
+      // completes.
+      myStart.single()
+        .merge(otherSocket.skipUntil(myStart))
+        .subscribe(mySocket);
 
       // Because of the single() on myStart, this message isn't
       // flushed until onCompleted() is called
@@ -92,9 +101,10 @@ exports.startServer = function (options) {
         t: Math.round(START_DELAY - recvLatency),
       }));
 
+      game[otherPlayer].unpinSocket();
+
       return function() {
         myStart.onCompleted();
-        mySocket.unpinOpen();
       };
     }
 
@@ -102,8 +112,7 @@ exports.startServer = function (options) {
     var goB = setupPlayer('b');
     setTimeout(function() {
       // Ideally these would be executed concurrently
-      goA();
-      goB();
+      goA(); goB();
     }, randRange(40));
 
     return log.shareValue('Game ' + gameNum);
@@ -131,8 +140,6 @@ function loopback(socket) {
   looped.onNext = function() {};
   looped.onCompleted = function() {};
 
-  // Mock socket API
-  looped.unpinOpen = function() {};
   return looped;
 
 }
