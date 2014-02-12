@@ -54,8 +54,7 @@ exports.startServer = function (options) {
     return latency.map(function(l) {
       return {
         latency: l,
-        unpinSocket: pin.dispose.bind(pin),
-        socket: socket,
+        socket: latch(socket),
       }})
   });
 
@@ -63,7 +62,6 @@ exports.startServer = function (options) {
     setup = setup.flatMap(function(connection) {
       return Rx.Observable.fromArray([connection, {
         latency: 0,
-        unpinSocket: function() {},
         socket: loopback(connection.socket),
       }]);
     });
@@ -86,13 +84,7 @@ exports.startServer = function (options) {
       var otherSocket = game[otherPlayer].socket;
 
       var myStart = new Rx.Subject();
-      // Using merge instead of concat here means that we
-      // can unpin the otherSocket once the pipeline is setup.
-      // Otherwise, the socket isn't subscribed until myStart
-      // completes.
-      myStart.single()
-        .merge(otherSocket.skipUntil(myStart))
-        .subscribe(mySocket);
+      myStart.single().concat(otherSocket).subscribe(mySocket);
 
       // Because of the single() on myStart, this message isn't
       // flushed until onCompleted() is called
@@ -100,8 +92,6 @@ exports.startServer = function (options) {
         player: player,
         t: Math.round(START_DELAY - recvLatency),
       }));
-
-      game[otherPlayer].unpinSocket();
 
       return function() {
         myStart.onCompleted();
@@ -118,6 +108,24 @@ exports.startServer = function (options) {
     return log.shareValue('Game ' + gameNum);
   }).mergeAll();
 }
+
+function latch(stream) {
+
+  var proxy = Rx.Observable.create(function(observer) {
+    stream.subscribe(observer);
+    subscription.dispose();
+  }).share();
+
+  proxy.onNext = stream.onNext.bind(stream);
+  proxy.onCompleted = stream.onCompleted.bind(stream);
+  proxy.onError = stream.onError.bind(stream);
+
+  // TODO: This should error the observer if we actually receive any of onNext,
+  // onCompleted, or onError in our subscription
+  var subscription = stream.subscribe(function() {});
+  return proxy;
+}
+
 
 function loopback(socket) {
   var looped = Rx.Observable.create(function(observer) {
