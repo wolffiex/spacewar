@@ -4,7 +4,7 @@ var Point = require('./Point');
 var _ = require('underscore');
 
 class Renderer {
-  constructor (ctx, initialShips) {
+  constructor (ctx, initialShips, simulation, countdown) {
     this.ctx = ctx;
     this.renderInfo = {
       ships : initialShips,
@@ -12,6 +12,18 @@ class Renderer {
       countdown: null,
       rocks: [],
     };
+
+    simulation.subscribe(state => {
+      this.renderInfo.ships = state.ships;
+      this.renderInfo.collisions = state.collisions;
+      this.renderInfo.rocks = state.rocks;
+    });
+
+    countdown.subscribe(
+      t => { this.renderInfo.countdown = t},
+      () => { console.error('Countdown error')},
+      () => { this.renderInfo.countdown = null},
+    );
   }
 
   render() {
@@ -59,23 +71,6 @@ class Renderer {
       ctx.font=fontSize + "px Courier";
       ctx.fillText(tSecInt+1, 200, 200);
     }
-  }
-
-  setSimulation(simulation) {
-    simulation.subscribe(state => {
-      this.renderInfo.ships = state.ships;
-      this.renderInfo.collisions = state.collisions;
-      this.renderInfo.rocks = state.rocks;
-    });
-  }
-
-  setCountdown(countdown) {
-    // countdown
-    countdown.subscribe(
-      t => { this.renderInfo.countdown = t},
-      () => { console.error('Countdown error')},
-      () => { this.renderInfo.countdown = null},
-    );
   }
 }
 
