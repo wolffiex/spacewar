@@ -2,7 +2,7 @@ var Rx = require('Rx');
 var _ = require('underscore');
 
 var RxWebSocket = require('RxWebSocket');
-var Draw = require('./Draw');
+var Renderer = require('./Renderer');
 var Point = require('./Point');
 var Keys = require('./Keys');
 var Shapes = require('./Shapes');
@@ -23,20 +23,14 @@ global.init = function (doc, canvas){
   var timer = new Rx.Subject();
   var updateTimer = () => {timer.onNext(Date.now())};
 
-  var renderInfo = {
-    ships : Game.initialShips,
-    collisions : [],
-    countdown: null,
-    rocks: [],
-  };
-
-  function render() {
-    Draw(ctx, renderInfo);
-    requestAnimationFrame(render);
+  var renderer = new Renderer(ctx, Game.initialShips);
+  function scheduler() {
+    renderer.render();
     _.defer(updateTimer);
+    requestAnimationFrame(scheduler);
   };
 
-  requestAnimationFrame(render);
+  requestAnimationFrame(scheduler);
 
   // Once the preamble is done, setup the game. This could be part of the
   // reactive pipeline, but the code is a little simpler if it's just written in
@@ -47,16 +41,17 @@ global.init = function (doc, canvas){
     // It's a circular dependency for the game simulation, so we need to use a
     // subject here and wire it up below
     var rockSubject = new Rx.Subject();
-    var recv = Msg.recv(socket);
 
     // Mark input with player and relative game time
-    var localInput = combineInputAndGame(
-      Keys.getStream(doc).merge(rockSubject), game)
+    var localInput = tagPlayerAndTime(game, 
+      Keys.getStream(doc).merge(rockSubject));
 
-    var inputStream = localInput.merge(recv('INPUT'));
+    var inputStream = localInput.merge(Msg.recv(socket, 'INPUT'));
     
     var gameTimer = timer.map(update => update - game.t).share();
     var updater = gameTimer.filter(t => t >= 0 );
+
+    renderer.setCountdown(gameTimer.takeUntil(updater).map(t => t * -1));
 
     var simulation = Game.simulation(inputStream, updater);
 
@@ -64,18 +59,7 @@ global.init = function (doc, canvas){
       Rocks.getRockStream(simulation).subscribe(rockSubject);
     }
 
-    simulation.subscribe(state => {
-      renderInfo.ships = state.ships;
-      renderInfo.collisions = state.collisions;
-      renderInfo.rocks = state.rocks;
-    });
-
-    // countdown
-    gameTimer.takeUntil(updater).map(t => t * -1).subscribe(
-      t => { renderInfo.countdown = t},
-      () => { console.error('Countdown error')},
-      () => { renderInfo.countdown = null},
-    );
+    renderer.setSimulation(simulation);
 
     // Send local input to other player
     return localInput.map(k => Msg('INPUT', k));
@@ -99,7 +83,7 @@ function getGameInfo(socket) {
   });
 }
 
-function combineInputAndGame(inputStream, game) {
+function tagPlayerAndTime(game, inputStream) {
   return inputStream.map((input) => {
       var t = Date.now() - game.t;
       input.t = t;

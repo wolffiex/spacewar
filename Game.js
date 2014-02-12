@@ -10,26 +10,15 @@ var deepCopy = utils.deepCopy;
 var notEmpty = utils.notEmpty;
 
 var START_DELAY = 5000;
-var START_DELAY = 5000;
-
-function randRange(x) {
-  return Math.floor(x + x * Math.random())
-}
 
 exports.startServer = function (options) {
   var server = RxWebSocketServer(options);
 
   // Setup determines average latency for the socket
   var setup = server.flatMap(function(socket) {
-
-    // This is lame, but we have to pin the socket open here so that it stays
-    // open even after we're done calculating latency but before the game starts
-    var pin = socket.subscribe(function() {});
-
     var recv = Msg.recv(socket);
-    var helo = Rx.Observable.return(Msg('HELO', Date.now())).share();
 
-    var recvSync = recv('SYNC').share(); 
+    var recvSync = recv('SYNC'); 
 
     var latency = recvSync
       .take(5)
@@ -38,6 +27,7 @@ exports.startServer = function (options) {
       }).share()
       .average();
 
+    var helo = Rx.Observable.return(Msg('HELO', Date.now())).share();
     var sync = recv('HELO').merge(recvSync)
       .delay(randRange(50))
       .takeUntil(latency)
@@ -46,9 +36,8 @@ exports.startServer = function (options) {
       })
       .share();
 
-    helo.merge(sync)
-      // Don't let socket close after sync is done
-      .concat(Rx.Observable.never())
+    // Don't let socket close after sync is done
+    helo.concat(sync, Rx.Observable.never())
       .subscribe(socket);
 
     return latency.map(function(l) {
@@ -58,6 +47,9 @@ exports.startServer = function (options) {
       }})
   });
 
+  // Set this to true to loopback one connection and make it so
+  // that one input stream controls both ships. This is useful
+  // for testing
   if (false) {
     setup = setup.flatMap(function(connection) {
       return Rx.Observable.fromArray([connection, {
@@ -151,3 +143,8 @@ function loopback(socket) {
   return looped;
 
 }
+
+function randRange(x) {
+  return Math.floor(x + x * Math.random())
+}
+
