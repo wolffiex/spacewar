@@ -92,9 +92,7 @@ function snapshot(snapped) {
 
   return function(stream, f) {
     return stream
-    .filter(()=>snap != EMPTY_SNAPSHOT)
-    .map(function(value) {
-      return f(snap, value);
-    });
+      .filter(() => snap != EMPTY_SNAPSHOT)
+      .map(value => f(snap, value));
   }
 }
