@@ -49,9 +49,10 @@ global.init = function (doc, canvas){
 
   var simulation = Game.simulation(inputStream, updater);
 
-  gameInfo.filter(game => game.player == 'a').subscribe(() => {
-    Rocks.getRockStream(simulation).subscribe(rockSubject)
-  });
+  // Only player "a" makes rocks
+  gameInfo.filter(game => game.player == 'a').flatMap(() => {
+    return Rocks.getRockStream(simulation);
+  }).subscribe(rockSubject);
 
   var countdown = gameTimer.takeUntil(updater).map(t => t * -1);
   var renderer = new Renderer(ctx, Game.initialShips, simulation, countdown);
