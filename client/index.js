@@ -38,7 +38,7 @@ global.init = function (doc, canvas){
     .filter(input => input.t >= 0)
     .share();
 
-  var inputStream = localInput.merge(Msg.recv(socket, 'INPUT'));
+  var inputStream = localInput.merge(Msg.recv(socket)('INPUT'));
   
   var gameTimer = combineGame(timer, (game, update) => update - game.t).share();
   var updater = gameTimer.filter(t => t >= 0 );
