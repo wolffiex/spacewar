@@ -21,7 +21,7 @@ global.init = function (doc, canvas){
   var gameInfo = getGameInfo(socket);
 
   var timer = new Rx.Subject();
-  var updateTimer = () => {timer.onNext(Date.now())};
+  timer.update = () => {timer.onNext(Date.now())};
 
   // This is either a stream of rocks if player="a" or empty
   // It's a circular dependency for the game simulation, so we need to use a
@@ -43,8 +43,7 @@ global.init = function (doc, canvas){
 
   var inputStream = localInput.merge(Msg.recv(socket, 'INPUT'));
   
-  var gameTimer = combineGame(timer,
-    (game, update) => update - game.t).share();
+  var gameTimer = combineGame(timer, (game, update) => update - game.t).share();
   var updater = gameTimer.filter(t => t >= 0 );
 
   var simulation = Game.simulation(inputStream, updater);
@@ -59,7 +58,7 @@ global.init = function (doc, canvas){
 
   function scheduler() {
     renderer.render();
-    _.defer(updateTimer);
+    _.defer(timer.update);
     requestAnimationFrame(scheduler);
   };
 
