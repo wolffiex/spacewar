@@ -3,12 +3,9 @@ var _ = require('underscore');
 
 var RxWebSocket = require('RxWebSocket');
 var Renderer = require('./Renderer');
-var Point = require('./Point');
 var Keys = require('./Keys');
-var Shapes = require('./Shapes');
-var Rocks = require('./Rocks');
 var Game = require('./Game');
-var notEmpty = require('utils').notEmpty;
+var Rocks = require('./Rocks');
 var Msg = require('utils').Msg;
 
 global.init = function (doc, canvas){
