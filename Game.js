@@ -21,10 +21,10 @@ exports.startServer = function (options) {
     var recvSync = recv('SYNC'); 
 
     var latency = recvSync
-      .take(5)
       .map(function(t) {
         return Date.now() - t;
       }).share()
+      .take(5)
       .average();
 
     var helo = Rx.Observable.return(Msg('HELO', Date.now())).share();
