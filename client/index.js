@@ -8,7 +8,7 @@ var Game = require('./Game');
 var Rocks = require('./Rocks');
 var Msg = require('utils').Msg;
 
-global.init = function (doc, canvas){
+window.init = function (doc, canvas){
   var ctx = canvas.getContext('2d');
 
   var hostname = doc.location.hostname;
