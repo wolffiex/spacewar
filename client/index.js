@@ -12,7 +12,7 @@ window.init = function (doc, canvas){
   var ctx = canvas.getContext('2d');
 
   var hostname = doc.location.hostname;
-  var socket = RxWebSocket("ws://" + hostname + ":3001");
+  var socket = RxWebSocket("ws://" + hostname + ":8081");
 
   // Game start time and player info
   var gameInfo = getGameInfo(socket);

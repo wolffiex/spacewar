@@ -11,9 +11,9 @@ browserify.settings('transform', ['es6ify']);
 app.use(express.static('./static'));
 app.use('/js', browserify('./client'));
 
-app.listen(3000);
+app.listen(8080);
 
-var log = Game.startServer({ port: 3001 });
+var log = Game.startServer({ port: 8081 });
 log.subscribe(function(line) {
   console.log(line);
 });
