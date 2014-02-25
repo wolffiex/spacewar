@@ -10,7 +10,7 @@ var deepCopy = utils.deepCopy;
 var notEmpty = utils.notEmpty;
 var timestamp = utils.timestamp;
 
-var START_DELAY = 1000;
+var START_DELAY = 3000;
 
 exports.startServer = function (options) {
   var server = RxWebSocketServer(options);
@@ -42,11 +42,11 @@ exports.startServer = function (options) {
     .subscribe(socket);
       
     return latency.map(function(l) {
-      return {
+      return socket.isClosed ? null : {
         latency: l,
         socket: latch(socket),
       }})
-  });
+  }).filter(notEmpty);
 
   // Set this to true to loopback one connection and make it so
   // that one input stream controls both ships. This is useful
