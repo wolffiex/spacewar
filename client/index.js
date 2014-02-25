@@ -7,6 +7,7 @@ var Keys = require('./Keys');
 var Game = require('./Game');
 var Rocks = require('./Rocks');
 var Msg = require('utils').Msg;
+var timestamp = require('utils').timestamp;
 
 window.init = function (doc, canvas){
   var ctx = canvas.getContext('2d');
@@ -28,10 +29,15 @@ window.init = function (doc, canvas){
   var combineGame = snapshot(gameInfo);
 
   // Mark input with player and relative game time
-  var localInput = combineGame(Keys.getStream(doc).merge(rockSubject),
-    (game, input) => {
-      var t = Date.now() - game.t;
-      input.t = t;
+  var stampedInput = timestamp(
+    Keys.getStream(doc).merge(rockSubject),
+    function(now, input) {
+      input.t = now;
+      return input;
+    });
+  
+  var localInput = combineGame(stampedInput, (game, input) => {
+      input.t  -= game.t;
       input.player = game.player;
       return input;
     })
@@ -75,9 +81,9 @@ function getGameInfo(socket) {
 
   helo.merge(sync).subscribe(socket);
 
-  return recv('START').map(function(start) {
+  return timestamp(recv('START'), function(now, start) {
     // record received from server = {t: <MS to wait before start>, player}
-    start.t += Date.now();
+    start.t += now;
     return start;
   }).share();
 }
