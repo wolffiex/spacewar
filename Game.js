@@ -8,8 +8,9 @@ var _ = require('underscore');
 var Msg = utils.Msg;
 var deepCopy = utils.deepCopy;
 var notEmpty = utils.notEmpty;
+var timestamp = utils.timestamp;
 
-var START_DELAY = 5000;
+var START_DELAY = 1000;
 
 exports.startServer = function (options) {
   var server = RxWebSocketServer(options);
@@ -20,26 +21,26 @@ exports.startServer = function (options) {
 
     var recvSync = recv('SYNC'); 
 
-    var latency = recvSync
-      .map(function(t) {
-        return Date.now() - t;
-      }).share()
+    var latency = timestamp(recvSync, function(now, t) {
+        return now - t;
+      })
       .take(5)
       .average();
 
-    var helo = Rx.Observable.return(Msg('HELO', Date.now())).share();
+    var helo = Rx.Observable.return('HELO');
+
     var sync = recv('HELO').merge(recvSync)
       .delay(randRange(50))
       .takeUntil(latency)
-      .map(function() {
-        return Msg('SYNC', Date.now())
-      })
-      .share();
+      .map(function() {return 'SYNC'});
 
     // Don't let socket close after sync is done
-    helo.concat(sync, Rx.Observable.never())
-      .subscribe(socket);
-
+    var outstream = helo.concat(sync, Rx.Observable.never());
+    var stamped = timestamp(outstream, function(now, msgKey) {
+        return Msg(msgKey, now);
+      })
+    .subscribe(socket);
+      
     return latency.map(function(l) {
       return {
         latency: l,
